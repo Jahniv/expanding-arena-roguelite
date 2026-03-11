@@ -1,0 +1,68 @@
+Package: vcpkg-cmake-config
+Version: 2024-05-23
+Architecture: x64-linux
+Multi-Arch: same
+Abi: 938b5e1dc7ceacf08654bef246055524d658786b56f39c96f3b23d2de8d063d3
+Status: install ok installed
+
+Package: vcpkg-cmake
+Version: 2024-04-23
+Architecture: x64-linux
+Multi-Arch: same
+Abi: f7cbaf4a1eecbbb1579be1e8dbbd016626910498335b8370236a4219615937b6
+Status: install ok installed
+
+Package: catch2
+Version: 3.13.0
+Port-Version: 1
+Depends: vcpkg-cmake, vcpkg-cmake-config
+Architecture: x64-linux
+Multi-Arch: same
+Abi: 805476c81ade95bb695ca4cacc75b4ac2b206fa4c41a1f17ff9fe8758b24a9f4
+Description: A modern, C++-native, test framework for unit-tests, TDD and BDD.
+Status: install ok installed
+
+Package: fmt
+Version: 12.1.0
+Depends: vcpkg-cmake, vcpkg-cmake-config
+Architecture: x64-linux
+Multi-Arch: same
+Abi: e19e0e090d40221e10cca54b0bfb3229a360f288764d3d2e890ed961c0d29eff
+Description: {fmt} is an open-source formatting library providing a fast and safe alternative to C stdio and C++ iostreams.
+Status: install ok installed
+
+Package: nlohmann-json
+Version: 3.12.0
+Port-Version: 2
+Depends: vcpkg-cmake, vcpkg-cmake-config
+Architecture: x64-linux
+Multi-Arch: same
+Abi: 7c59e96fb888e0ebadae627a6d1585275bf361667cc118fbee8aa504d7843976
+Description: JSON for Modern C++
+Status: install ok installed
+
+Package: spdlog
+Version: 1.17.0
+Depends: vcpkg-cmake, vcpkg-cmake-config
+Architecture: x64-linux
+Multi-Arch: same
+Abi: 567bbb4b8d04352e01dab305de65d578bdb0ac9a9322ab9fceff36353aa6500d
+Description: Very fast, header-only/compiled, C++ logging library.
+Default-Features: fmt, tz-offset
+Status: install ok installed
+
+Package: spdlog
+Feature: fmt
+Depends: fmt
+Architecture: x64-linux
+Multi-Arch: same
+Description: Use fmt library
+Status: install ok installed
+
+Package: spdlog
+Feature: tz-offset
+Architecture: x64-linux
+Multi-Arch: same
+Description: Omit %z timezone offset (use on platforms without tm_gmtoff)
+Status: install ok installed
+

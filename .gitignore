@@ -1,0 +1,16 @@
+/build/
+/out/
+/.vscode/
+/.idea/
+/.cache/
+/compile_commands.json
+
+*.o
+*.obj
+*.a
+*.so
+*.dll
+*.exe
+
+.DS_Store
+Thumbs.db
