@@ -18,6 +18,15 @@ public:
     bool is_attacking() const;
     bool attack_hits(const SDL_FRect& target) const;
 
+    bool try_take_damage(int amount);
+    bool is_dead() const;
+    bool is_invulnerable() const;
+
+    int hp() const;
+    int max_hp() const;
+
+    void reset();
+
     float center_x() const;
     float center_y() const;
 
@@ -37,6 +46,10 @@ private:
 
     float attack_timer_ = 0.0f;
     float attack_cooldown_ = 0.0f;
+    float damage_invulnerability_timer_ = 0.0f;
+
+    int hp_ = 5;
+    int max_hp_ = 5;
 };
 
 } // namespace ear

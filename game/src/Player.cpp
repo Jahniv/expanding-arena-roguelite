@@ -38,7 +38,7 @@ void Player::on_key_down(SDL_Keycode key, bool repeat) {
             move_right_ = true;
             break;
         case SDLK_SPACE:
-            if (attack_timer_ <= 0.0f && attack_cooldown_ <= 0.0f) {
+            if (attack_timer_ <= 0.0f && attack_cooldown_ <= 0.0f && !is_dead()) {
                 attack_timer_ = 0.12f;
                 attack_cooldown_ = 0.25f;
             }
@@ -72,6 +72,14 @@ void Player::on_key_up(SDL_Keycode key) {
 }
 
 void Player::update(float dt_seconds, int window_width, int window_height) {
+    attack_timer_ = std::max(0.0f, attack_timer_ - dt_seconds);
+    attack_cooldown_ = std::max(0.0f, attack_cooldown_ - dt_seconds);
+    damage_invulnerability_timer_ = std::max(0.0f, damage_invulnerability_timer_ - dt_seconds);
+
+    if (is_dead()) {
+        return;
+    }
+
     float dx = 0.0f;
     float dy = 0.0f;
 
@@ -102,15 +110,17 @@ void Player::update(float dt_seconds, int window_width, int window_height) {
 
     x_ = std::clamp(x_, 0.0f, static_cast<float>(window_width) - size_);
     y_ = std::clamp(y_, 0.0f, static_cast<float>(window_height) - size_);
-
-    attack_timer_ = std::max(0.0f, attack_timer_ - dt_seconds);
-    attack_cooldown_ = std::max(0.0f, attack_cooldown_ - dt_seconds);
 }
 
 void Player::render(SDL_Renderer* renderer) const {
     const SDL_FRect player_rect = bounds();
 
-    SDL_SetRenderDrawColor(renderer, 80, 200, 120, 255);
+    if (is_invulnerable()) {
+        SDL_SetRenderDrawColor(renderer, 120, 220, 255, 255);
+    } else {
+        SDL_SetRenderDrawColor(renderer, 80, 200, 120, 255);
+    }
+
     SDL_RenderFillRect(renderer, &player_rect);
 
     if (is_attacking()) {
@@ -177,6 +187,53 @@ bool Player::attack_hits(const SDL_FRect& target) const {
     }
 
     return rects_overlap(attack_bounds(), target);
+}
+
+bool Player::try_take_damage(int amount) {
+    if (amount <= 0 || is_dead() || is_invulnerable()) {
+        return false;
+    }
+
+    hp_ = std::max(0, hp_ - amount);
+    damage_invulnerability_timer_ = 0.70f;
+    return true;
+}
+
+bool Player::is_dead() const {
+    return hp_ <= 0;
+}
+
+bool Player::is_invulnerable() const {
+    return damage_invulnerability_timer_ > 0.0f;
+}
+
+int Player::hp() const {
+    return hp_;
+}
+
+int Player::max_hp() const {
+    return max_hp_;
+}
+
+void Player::reset() {
+    x_ = 120.0f;
+    y_ = 320.0f;
+    size_ = 50.0f;
+    speed_ = 300.0f;
+
+    move_up_ = false;
+    move_down_ = false;
+    move_left_ = false;
+    move_right_ = false;
+
+    facing_x_ = 1.0f;
+    facing_y_ = 0.0f;
+
+    attack_timer_ = 0.0f;
+    attack_cooldown_ = 0.0f;
+    damage_invulnerability_timer_ = 0.0f;
+
+    hp_ = max_hp_;
 }
 
 float Player::center_x() const {

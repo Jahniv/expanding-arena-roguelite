@@ -5,6 +5,16 @@
 #include <iostream>
 
 namespace ear {
+namespace {
+
+bool rects_overlap(const SDL_FRect& a, const SDL_FRect& b) {
+    return a.x < (b.x + b.w) &&
+           (a.x + a.w) > b.x &&
+           a.y < (b.y + b.h) &&
+           (a.y + a.h) > b.y;
+}
+
+} // namespace
 
 bool App::initialize() {
     if (!SDL_Init(SDL_INIT_VIDEO)) {
@@ -34,6 +44,8 @@ bool App::initialize() {
         SDL_Quit();
         return false;
     }
+
+    SDL_SetRenderDrawBlendMode(renderer_, SDL_BLENDMODE_BLEND);
 
     running_ = true;
 
@@ -88,21 +100,43 @@ void App::handle_events() {
                 running_ = false;
             }
 
-            player_.on_key_down(event.key.key, event.key.repeat);
+            if (game_over_) {
+                if (event.key.key == SDLK_R && !event.key.repeat) {
+                    restart_game();
+                }
+            } else {
+                player_.on_key_down(event.key.key, event.key.repeat);
+            }
         }
 
-        if (event.type == SDL_EVENT_KEY_UP) {
+        if (event.type == SDL_EVENT_KEY_UP && !game_over_) {
             player_.on_key_up(event.key.key);
         }
     }
 }
 
 void App::update(float dt_seconds) {
+    if (game_over_) {
+        return;
+    }
+
     player_.update(dt_seconds, window_width_, window_height_);
     enemy_.update(player_.center_x(), player_.center_y(), dt_seconds);
 
     if (player_.attack_hits(enemy_.bounds())) {
         enemy_.respawn();
+    }
+
+    if (rects_overlap(player_.bounds(), enemy_.bounds())) {
+        if (player_.try_take_damage(1)) {
+            fmt::print("Player took damage. HP: {}\n", player_.hp());
+            enemy_.respawn();
+
+            if (player_.is_dead()) {
+                game_over_ = true;
+                fmt::print("Game Over. Press R to restart.\n");
+            }
+        }
     }
 }
 
@@ -112,8 +146,67 @@ void App::render() {
 
     enemy_.render(renderer_);
     player_.render(renderer_);
+    render_hp_bar();
+
+    if (game_over_) {
+        render_game_over_overlay();
+    }
 
     SDL_RenderPresent(renderer_);
+}
+
+void App::render_hp_bar() {
+    const float start_x = 24.0f;
+    const float start_y = 24.0f;
+    const float box_width = 34.0f;
+    const float box_height = 18.0f;
+    const float gap = 8.0f;
+
+    for (int i = 0; i < player_.max_hp(); ++i) {
+        const SDL_FRect rect{
+            start_x + i * (box_width + gap),
+            start_y,
+            box_width,
+            box_height
+        };
+
+        if (i < player_.hp()) {
+            SDL_SetRenderDrawColor(renderer_, 210, 70, 70, 255);
+        } else {
+            SDL_SetRenderDrawColor(renderer_, 70, 70, 70, 255);
+        }
+
+        SDL_RenderFillRect(renderer_, &rect);
+    }
+}
+
+void App::render_game_over_overlay() {
+    const SDL_FRect full_screen{
+        0.0f,
+        0.0f,
+        static_cast<float>(window_width_),
+        static_cast<float>(window_height_)
+    };
+
+    SDL_SetRenderDrawColor(renderer_, 120, 10, 10, 120);
+    SDL_RenderFillRect(renderer_, &full_screen);
+
+    const SDL_FRect center_panel{
+        360.0f,
+        260.0f,
+        560.0f,
+        200.0f
+    };
+
+    SDL_SetRenderDrawColor(renderer_, 25, 25, 25, 220);
+    SDL_RenderFillRect(renderer_, &center_panel);
+}
+
+void App::restart_game() {
+    player_.reset();
+    enemy_.respawn();
+    game_over_ = false;
+    fmt::print("Game restarted.\n");
 }
 
 } // namespace ear
