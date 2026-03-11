@@ -38,11 +38,51 @@ void Player::on_key_down(SDL_Keycode key, bool repeat) {
             move_right_ = true;
             break;
         case SDLK_SPACE:
-            if (attack_timer_ <= 0.0f && attack_cooldown_ <= 0.0f && !is_dead()) {
-                attack_timer_ = 0.12f;
-                attack_cooldown_ = 0.25f;
+            if (attack_timer_ <= 0.0f &&
+                attack_cooldown_timer_ <= 0.0f &&
+                !is_dead() &&
+                !is_dashing()) {
+                attack_timer_ = attack_duration_;
+                attack_cooldown_timer_ = attack_cooldown_duration_;
             }
             break;
+        case SDLK_LSHIFT:
+        case SDLK_RSHIFT: {
+            if (dash_timer_ > 0.0f || dash_cooldown_timer_ > 0.0f || is_dead()) {
+                break;
+            }
+
+            float dx = 0.0f;
+            float dy = 0.0f;
+
+            if (move_up_) {
+                dy -= 1.0f;
+            }
+            if (move_down_) {
+                dy += 1.0f;
+            }
+            if (move_left_) {
+                dx -= 1.0f;
+            }
+            if (move_right_) {
+                dx += 1.0f;
+            }
+
+            if (dx == 0.0f && dy == 0.0f) {
+                dx = facing_x_;
+                dy = facing_y_;
+            }
+
+            const float length = std::sqrt(dx * dx + dy * dy);
+
+            if (length > 0.001f) {
+                dash_dir_x_ = dx / length;
+                dash_dir_y_ = dy / length;
+                dash_timer_ = dash_duration_;
+                dash_cooldown_timer_ = dash_cooldown_duration_;
+            }
+            break;
+        }
         default:
             break;
     }
@@ -73,10 +113,21 @@ void Player::on_key_up(SDL_Keycode key) {
 
 void Player::update(float dt_seconds, int window_width, int window_height) {
     attack_timer_ = std::max(0.0f, attack_timer_ - dt_seconds);
-    attack_cooldown_ = std::max(0.0f, attack_cooldown_ - dt_seconds);
+    attack_cooldown_timer_ = std::max(0.0f, attack_cooldown_timer_ - dt_seconds);
+    dash_timer_ = std::max(0.0f, dash_timer_ - dt_seconds);
+    dash_cooldown_timer_ = std::max(0.0f, dash_cooldown_timer_ - dt_seconds);
     damage_invulnerability_timer_ = std::max(0.0f, damage_invulnerability_timer_ - dt_seconds);
 
     if (is_dead()) {
+        return;
+    }
+
+    if (is_dashing()) {
+        x_ += dash_dir_x_ * dash_speed_ * dt_seconds;
+        y_ += dash_dir_y_ * dash_speed_ * dt_seconds;
+
+        x_ = std::clamp(x_, 0.0f, static_cast<float>(window_width) - size_);
+        y_ = std::clamp(y_, 0.0f, static_cast<float>(window_height) - size_);
         return;
     }
 
@@ -115,7 +166,9 @@ void Player::update(float dt_seconds, int window_width, int window_height) {
 void Player::render(SDL_Renderer* renderer) const {
     const SDL_FRect player_rect = bounds();
 
-    if (is_invulnerable()) {
+    if (is_dashing()) {
+        SDL_SetRenderDrawColor(renderer, 210, 160, 255, 255);
+    } else if (damage_invulnerability_timer_ > 0.0f) {
         SDL_SetRenderDrawColor(renderer, 120, 220, 255, 255);
     } else {
         SDL_SetRenderDrawColor(renderer, 80, 200, 120, 255);
@@ -181,6 +234,10 @@ bool Player::is_attacking() const {
     return attack_timer_ > 0.0f;
 }
 
+bool Player::is_dashing() const {
+    return dash_timer_ > 0.0f;
+}
+
 bool Player::attack_hits(const SDL_FRect& target) const {
     if (!is_attacking()) {
         return false;
@@ -204,7 +261,7 @@ bool Player::is_dead() const {
 }
 
 bool Player::is_invulnerable() const {
-    return damage_invulnerability_timer_ > 0.0f;
+    return damage_invulnerability_timer_ > 0.0f || dash_timer_ > 0.0f;
 }
 
 int Player::hp() const {
@@ -213,6 +270,22 @@ int Player::hp() const {
 
 int Player::max_hp() const {
     return max_hp_;
+}
+
+float Player::attack_cooldown_ratio() const {
+    if (attack_cooldown_duration_ <= 0.0f) {
+        return 0.0f;
+    }
+
+    return std::clamp(attack_cooldown_timer_ / attack_cooldown_duration_, 0.0f, 1.0f);
+}
+
+float Player::dash_cooldown_ratio() const {
+    if (dash_cooldown_duration_ <= 0.0f) {
+        return 0.0f;
+    }
+
+    return std::clamp(dash_cooldown_timer_ / dash_cooldown_duration_, 0.0f, 1.0f);
 }
 
 void Player::reset() {
@@ -230,7 +303,11 @@ void Player::reset() {
     facing_y_ = 0.0f;
 
     attack_timer_ = 0.0f;
-    attack_cooldown_ = 0.0f;
+    attack_cooldown_timer_ = 0.0f;
+    dash_timer_ = 0.0f;
+    dash_cooldown_timer_ = 0.0f;
+    dash_dir_x_ = 1.0f;
+    dash_dir_y_ = 0.0f;
     damage_invulnerability_timer_ = 0.0f;
 
     hp_ = max_hp_;

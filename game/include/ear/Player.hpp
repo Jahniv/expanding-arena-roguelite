@@ -16,6 +16,7 @@ public:
     SDL_FRect attack_bounds() const;
 
     bool is_attacking() const;
+    bool is_dashing() const;
     bool attack_hits(const SDL_FRect& target) const;
 
     bool try_take_damage(int amount);
@@ -24,6 +25,9 @@ public:
 
     int hp() const;
     int max_hp() const;
+
+    float attack_cooldown_ratio() const;
+    float dash_cooldown_ratio() const;
 
     void reset();
 
@@ -45,7 +49,18 @@ private:
     float facing_y_ = 0.0f;
 
     float attack_timer_ = 0.0f;
-    float attack_cooldown_ = 0.0f;
+    float attack_cooldown_timer_ = 0.0f;
+    float attack_duration_ = 0.12f;
+    float attack_cooldown_duration_ = 0.25f;
+
+    float dash_timer_ = 0.0f;
+    float dash_cooldown_timer_ = 0.0f;
+    float dash_duration_ = 0.14f;
+    float dash_cooldown_duration_ = 0.85f;
+    float dash_speed_ = 780.0f;
+    float dash_dir_x_ = 1.0f;
+    float dash_dir_y_ = 0.0f;
+
     float damage_invulnerability_timer_ = 0.0f;
 
     int hp_ = 5;

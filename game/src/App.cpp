@@ -188,6 +188,7 @@ void App::render() {
 
     player_.render(renderer_);
     render_hp_bar();
+    render_status_bars();
 
     if (game_over_) {
         render_game_over_overlay();
@@ -219,6 +220,44 @@ void App::render_hp_bar() {
 
         SDL_RenderFillRect(renderer_, &rect);
     }
+}
+
+void App::render_status_bars() {
+    const float bar_x = 24.0f;
+    const float attack_bar_y = 56.0f;
+    const float dash_bar_y = 78.0f;
+    const float bar_width = 180.0f;
+    const float bar_height = 12.0f;
+
+    const SDL_FRect attack_bg{ bar_x, attack_bar_y, bar_width, bar_height };
+    const SDL_FRect dash_bg{ bar_x, dash_bar_y, bar_width, bar_height };
+
+    SDL_SetRenderDrawColor(renderer_, 55, 55, 55, 255);
+    SDL_RenderFillRect(renderer_, &attack_bg);
+    SDL_RenderFillRect(renderer_, &dash_bg);
+
+    const float attack_ready_ratio = 1.0f - player_.attack_cooldown_ratio();
+    const float dash_ready_ratio = 1.0f - player_.dash_cooldown_ratio();
+
+    const SDL_FRect attack_fill{
+        bar_x,
+        attack_bar_y,
+        bar_width * std::clamp(attack_ready_ratio, 0.0f, 1.0f),
+        bar_height
+    };
+
+    const SDL_FRect dash_fill{
+        bar_x,
+        dash_bar_y,
+        bar_width * std::clamp(dash_ready_ratio, 0.0f, 1.0f),
+        bar_height
+    };
+
+    SDL_SetRenderDrawColor(renderer_, 230, 200, 70, 255);
+    SDL_RenderFillRect(renderer_, &attack_fill);
+
+    SDL_SetRenderDrawColor(renderer_, 170, 120, 255, 255);
+    SDL_RenderFillRect(renderer_, &dash_fill);
 }
 
 void App::render_game_over_overlay() {
