@@ -1,6 +1,8 @@
 #pragma once
 
 #include <SDL3/SDL.h>
+#include "ear/Enemy.hpp"
+#include "ear/Player.hpp"
 
 namespace ear {
 
@@ -19,15 +21,8 @@ private:
     SDL_Renderer* renderer_ = nullptr;
     bool running_ = false;
 
-    float player_x_ = 120.0f;
-    float player_y_ = 320.0f;
-    float player_size_ = 50.0f;
-    float player_speed_ = 300.0f;
-
-    bool move_up_ = false;
-    bool move_down_ = false;
-    bool move_left_ = false;
-    bool move_right_ = false;
+    Player player_;
+    Enemy enemy_;
 
     static constexpr int window_width_ = 1280;
     static constexpr int window_height_ = 720;

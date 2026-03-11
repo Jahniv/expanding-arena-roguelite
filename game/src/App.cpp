@@ -1,7 +1,6 @@
 #include "ear/App.hpp"
 
 #include <fmt/core.h>
-#include <algorithm>
 #include <chrono>
 #include <iostream>
 
@@ -84,94 +83,35 @@ void App::handle_events() {
             running_ = false;
         }
 
-        if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat) {
-            switch (event.key.key) {
-                case SDLK_ESCAPE:
-                    running_ = false;
-                    break;
-                case SDLK_W:
-                case SDLK_UP:
-                    move_up_ = true;
-                    break;
-                case SDLK_S:
-                case SDLK_DOWN:
-                    move_down_ = true;
-                    break;
-                case SDLK_A:
-                case SDLK_LEFT:
-                    move_left_ = true;
-                    break;
-                case SDLK_D:
-                case SDLK_RIGHT:
-                    move_right_ = true;
-                    break;
-                default:
-                    break;
+        if (event.type == SDL_EVENT_KEY_DOWN) {
+            if (event.key.key == SDLK_ESCAPE && !event.key.repeat) {
+                running_ = false;
             }
+
+            player_.on_key_down(event.key.key, event.key.repeat);
         }
 
         if (event.type == SDL_EVENT_KEY_UP) {
-            switch (event.key.key) {
-                case SDLK_W:
-                case SDLK_UP:
-                    move_up_ = false;
-                    break;
-                case SDLK_S:
-                case SDLK_DOWN:
-                    move_down_ = false;
-                    break;
-                case SDLK_A:
-                case SDLK_LEFT:
-                    move_left_ = false;
-                    break;
-                case SDLK_D:
-                case SDLK_RIGHT:
-                    move_right_ = false;
-                    break;
-                default:
-                    break;
-            }
+            player_.on_key_up(event.key.key);
         }
     }
 }
 
 void App::update(float dt_seconds) {
-    float dx = 0.0f;
-    float dy = 0.0f;
+    player_.update(dt_seconds, window_width_, window_height_);
+    enemy_.update(player_.center_x(), player_.center_y(), dt_seconds);
 
-    if (move_up_) {
-        dy -= 1.0f;
+    if (player_.attack_hits(enemy_.bounds())) {
+        enemy_.respawn();
     }
-    if (move_down_) {
-        dy += 1.0f;
-    }
-    if (move_left_) {
-        dx -= 1.0f;
-    }
-    if (move_right_) {
-        dx += 1.0f;
-    }
-
-    player_x_ += dx * player_speed_ * dt_seconds;
-    player_y_ += dy * player_speed_ * dt_seconds;
-
-    player_x_ = std::clamp(player_x_, 0.0f, static_cast<float>(window_width_) - player_size_);
-    player_y_ = std::clamp(player_y_, 0.0f, static_cast<float>(window_height_) - player_size_);
 }
 
 void App::render() {
     SDL_SetRenderDrawColor(renderer_, 20, 24, 32, 255);
     SDL_RenderClear(renderer_);
 
-    const SDL_FRect player_rect{
-        player_x_,
-        player_y_,
-        player_size_,
-        player_size_
-    };
-
-    SDL_SetRenderDrawColor(renderer_, 80, 200, 120, 255);
-    SDL_RenderFillRect(renderer_, &player_rect);
+    enemy_.render(renderer_);
+    player_.render(renderer_);
 
     SDL_RenderPresent(renderer_);
 }

@@ -12,6 +12,8 @@ FetchContent_MakeAvailable(SDL3)
 
 add_library(ear_game_lib STATIC
     src/App.cpp
+    src/Player.cpp
+    src/Enemy.cpp
 )
 
 target_include_directories(ear_game_lib
