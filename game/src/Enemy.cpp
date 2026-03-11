@@ -4,11 +4,19 @@
 
 namespace ear {
 
-Enemy::Enemy(float spawn_x, float spawn_y)
-    : spawn_x_(spawn_x),
+Enemy::Enemy(float spawn_x, float spawn_y, EnemyType type)
+    : type_(type),
+      spawn_x_(spawn_x),
       spawn_y_(spawn_y),
       x_(spawn_x),
       y_(spawn_y) {
+    if (type_ == EnemyType::Brute) {
+        size_ = 62.0f;
+        base_speed_ = 82.0f;
+    } else {
+        size_ = 44.0f;
+        base_speed_ = 120.0f;
+    }
 }
 
 void Enemy::update(float target_x, float target_y, float dt_seconds, float speed_multiplier) {
@@ -31,7 +39,13 @@ void Enemy::update(float target_x, float target_y, float dt_seconds, float speed
 
 void Enemy::render(SDL_Renderer* renderer) const {
     const SDL_FRect enemy_rect = bounds();
-    SDL_SetRenderDrawColor(renderer, 220, 70, 70, 255);
+
+    if (type_ == EnemyType::Brute) {
+        SDL_SetRenderDrawColor(renderer, 180, 90, 230, 255);
+    } else {
+        SDL_SetRenderDrawColor(renderer, 220, 70, 70, 255);
+    }
+
     SDL_RenderFillRect(renderer, &enemy_rect);
 }
 
@@ -42,6 +56,14 @@ SDL_FRect Enemy::bounds() const {
 void Enemy::respawn() {
     x_ = spawn_x_;
     y_ = spawn_y_;
+}
+
+EnemyType Enemy::type() const {
+    return type_;
+}
+
+int Enemy::score_value() const {
+    return type_ == EnemyType::Brute ? 160 : 100;
 }
 
 } // namespace ear

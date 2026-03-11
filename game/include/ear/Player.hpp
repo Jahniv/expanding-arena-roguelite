@@ -55,11 +55,14 @@ private:
 
     float dash_timer_ = 0.0f;
     float dash_cooldown_timer_ = 0.0f;
-    float dash_duration_ = 0.14f;
+    float dash_duration_ = 0.18f;
     float dash_cooldown_duration_ = 0.85f;
-    float dash_speed_ = 780.0f;
+    float dash_speed_ = 860.0f;
     float dash_dir_x_ = 1.0f;
     float dash_dir_y_ = 0.0f;
+
+    float post_dash_invulnerability_timer_ = 0.0f;
+    float post_dash_invulnerability_duration_ = 0.10f;
 
     float damage_invulnerability_timer_ = 0.0f;
 

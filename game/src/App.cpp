@@ -129,7 +129,7 @@ void App::update(float dt_seconds) {
 
     player_.update(dt_seconds, window_width_, window_height_);
 
-    const float enemy_speed_multiplier = 1.0f + 0.12f * static_cast<float>(wave_ - 1);
+    const float enemy_speed_multiplier = std::min(1.0f + 0.06f * static_cast<float>(wave_ - 1), 1.45f);
 
     for (int i = 0; i < active_enemy_count_; ++i) {
         enemies_[i].update(player_.center_x(), player_.center_y(), dt_seconds, enemy_speed_multiplier);
@@ -137,13 +137,14 @@ void App::update(float dt_seconds) {
 
     for (int i = 0; i < active_enemy_count_; ++i) {
         if (player_.attack_hits(enemies_[i].bounds())) {
+            const int gained_score = enemies_[i].score_value();
             enemies_[i].respawn();
 
             ++kills_total_;
             ++kills_in_wave_;
-            score_ += 100;
+            score_ += gained_score;
 
-            fmt::print("Kill {} | Score {} | Wave {}\n", kills_total_, score_, wave_);
+            fmt::print("Kill {} | +{} score | Total {} | Wave {}\n", kills_total_, gained_score, score_, wave_);
 
             if (kills_in_wave_ >= kills_per_wave_) {
                 ++wave_;
@@ -303,11 +304,11 @@ void App::restart_game() {
 void App::initialize_enemies() {
     enemies_.clear();
 
-    enemies_.emplace_back(920.0f, 180.0f);
-    enemies_.emplace_back(1080.0f, 540.0f);
-    enemies_.emplace_back(160.0f, 120.0f);
-    enemies_.emplace_back(180.0f, 560.0f);
-    enemies_.emplace_back(620.0f, 80.0f);
+    enemies_.emplace_back(920.0f, 180.0f, EnemyType::Chaser);
+    enemies_.emplace_back(1080.0f, 540.0f, EnemyType::Chaser);
+    enemies_.emplace_back(160.0f, 120.0f, EnemyType::Brute);
+    enemies_.emplace_back(180.0f, 560.0f, EnemyType::Chaser);
+    enemies_.emplace_back(620.0f, 80.0f, EnemyType::Brute);
 }
 
 void App::update_window_title() {

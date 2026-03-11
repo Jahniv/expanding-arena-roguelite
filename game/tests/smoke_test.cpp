@@ -27,3 +27,13 @@ TEST_CASE("dash makes player temporarily invulnerable") {
     REQUIRE_FALSE(player.try_take_damage(1));
     REQUIRE(player.hp() == player.max_hp());
 }
+
+TEST_CASE("post dash grace keeps player invulnerable briefly") {
+    ear::Player player;
+
+    player.on_key_down(SDLK_LSHIFT, false);
+    player.update(0.19f, 1280, 720);
+
+    REQUIRE_FALSE(player.is_dashing());
+    REQUIRE(player.is_invulnerable());
+}

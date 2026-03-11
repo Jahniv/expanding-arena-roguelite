@@ -80,6 +80,7 @@ void Player::on_key_down(SDL_Keycode key, bool repeat) {
                 dash_dir_y_ = dy / length;
                 dash_timer_ = dash_duration_;
                 dash_cooldown_timer_ = dash_cooldown_duration_;
+                post_dash_invulnerability_timer_ = 0.0f;
             }
             break;
         }
@@ -114,9 +115,20 @@ void Player::on_key_up(SDL_Keycode key) {
 void Player::update(float dt_seconds, int window_width, int window_height) {
     attack_timer_ = std::max(0.0f, attack_timer_ - dt_seconds);
     attack_cooldown_timer_ = std::max(0.0f, attack_cooldown_timer_ - dt_seconds);
+    
+    post_dash_invulnerability_timer_ =
+    	std::max(0.0f, post_dash_invulnerability_timer_ - dt_seconds);
+
+    const float previous_dash_timer = dash_timer_;
     dash_timer_ = std::max(0.0f, dash_timer_ - dt_seconds);
     dash_cooldown_timer_ = std::max(0.0f, dash_cooldown_timer_ - dt_seconds);
-    damage_invulnerability_timer_ = std::max(0.0f, damage_invulnerability_timer_ - dt_seconds);
+
+    if (previous_dash_timer > 0.0f && dash_timer_ <= 0.0f) {
+        post_dash_invulnerability_timer_ = post_dash_invulnerability_duration_;
+    }
+
+    damage_invulnerability_timer_ =
+    	std::max(0.0f, damage_invulnerability_timer_ - dt_seconds);
 
     if (is_dead()) {
         return;
@@ -125,7 +137,6 @@ void Player::update(float dt_seconds, int window_width, int window_height) {
     if (is_dashing()) {
         x_ += dash_dir_x_ * dash_speed_ * dt_seconds;
         y_ += dash_dir_y_ * dash_speed_ * dt_seconds;
-
         x_ = std::clamp(x_, 0.0f, static_cast<float>(window_width) - size_);
         y_ = std::clamp(y_, 0.0f, static_cast<float>(window_height) - size_);
         return;
@@ -168,6 +179,8 @@ void Player::render(SDL_Renderer* renderer) const {
 
     if (is_dashing()) {
         SDL_SetRenderDrawColor(renderer, 210, 160, 255, 255);
+    } else if (post_dash_invulnerability_timer_ > 0.0f) {
+        SDL_SetRenderDrawColor(renderer, 200, 180, 255, 255);
     } else if (damage_invulnerability_timer_ > 0.0f) {
         SDL_SetRenderDrawColor(renderer, 120, 220, 255, 255);
     } else {
@@ -261,7 +274,9 @@ bool Player::is_dead() const {
 }
 
 bool Player::is_invulnerable() const {
-    return damage_invulnerability_timer_ > 0.0f || dash_timer_ > 0.0f;
+    return damage_invulnerability_timer_ > 0.0f ||
+           dash_timer_ > 0.0f ||
+           post_dash_invulnerability_timer_ > 0.0f;
 }
 
 int Player::hp() const {
@@ -308,6 +323,7 @@ void Player::reset() {
     dash_cooldown_timer_ = 0.0f;
     dash_dir_x_ = 1.0f;
     dash_dir_y_ = 0.0f;
+    post_dash_invulnerability_timer_ = 0.0f;
     damage_invulnerability_timer_ = 0.0f;
 
     hp_ = max_hp_;
