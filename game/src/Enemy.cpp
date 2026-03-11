@@ -4,7 +4,14 @@
 
 namespace ear {
 
-void Enemy::update(float target_x, float target_y, float dt_seconds) {
+Enemy::Enemy(float spawn_x, float spawn_y)
+    : spawn_x_(spawn_x),
+      spawn_y_(spawn_y),
+      x_(spawn_x),
+      y_(spawn_y) {
+}
+
+void Enemy::update(float target_x, float target_y, float dt_seconds, float speed_multiplier) {
     const float my_center_x = x_ + size_ * 0.5f;
     const float my_center_y = y_ + size_ * 0.5f;
 
@@ -17,8 +24,8 @@ void Enemy::update(float target_x, float target_y, float dt_seconds) {
         dx /= length;
         dy /= length;
 
-        x_ += dx * speed_ * dt_seconds;
-        y_ += dy * speed_ * dt_seconds;
+        x_ += dx * base_speed_ * speed_multiplier * dt_seconds;
+        y_ += dy * base_speed_ * speed_multiplier * dt_seconds;
     }
 }
 
@@ -33,8 +40,8 @@ SDL_FRect Enemy::bounds() const {
 }
 
 void Enemy::respawn() {
-    x_ = 920.0f;
-    y_ = 180.0f;
+    x_ = spawn_x_;
+    y_ = spawn_y_;
 }
 
 } // namespace ear

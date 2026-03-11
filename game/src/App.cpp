@@ -1,8 +1,12 @@
 #include "ear/App.hpp"
 
 #include <fmt/core.h>
+#include <fmt/format.h>
+
+#include <algorithm>
 #include <chrono>
 #include <iostream>
+#include <string>
 
 namespace ear {
 namespace {
@@ -46,6 +50,9 @@ bool App::initialize() {
     }
 
     SDL_SetRenderDrawBlendMode(renderer_, SDL_BLENDMODE_BLEND);
+
+    initialize_enemies();
+    update_window_title();
 
     running_ = true;
 
@@ -121,20 +128,51 @@ void App::update(float dt_seconds) {
     }
 
     player_.update(dt_seconds, window_width_, window_height_);
-    enemy_.update(player_.center_x(), player_.center_y(), dt_seconds);
 
-    if (player_.attack_hits(enemy_.bounds())) {
-        enemy_.respawn();
+    const float enemy_speed_multiplier = 1.0f + 0.12f * static_cast<float>(wave_ - 1);
+
+    for (int i = 0; i < active_enemy_count_; ++i) {
+        enemies_[i].update(player_.center_x(), player_.center_y(), dt_seconds, enemy_speed_multiplier);
     }
 
-    if (rects_overlap(player_.bounds(), enemy_.bounds())) {
-        if (player_.try_take_damage(1)) {
-            fmt::print("Player took damage. HP: {}\n", player_.hp());
-            enemy_.respawn();
+    for (int i = 0; i < active_enemy_count_; ++i) {
+        if (player_.attack_hits(enemies_[i].bounds())) {
+            enemies_[i].respawn();
 
-            if (player_.is_dead()) {
-                game_over_ = true;
-                fmt::print("Game Over. Press R to restart.\n");
+            ++kills_total_;
+            ++kills_in_wave_;
+            score_ += 100;
+
+            fmt::print("Kill {} | Score {} | Wave {}\n", kills_total_, score_, wave_);
+
+            if (kills_in_wave_ >= kills_per_wave_) {
+                ++wave_;
+                kills_in_wave_ = 0;
+
+                if (active_enemy_count_ < static_cast<int>(enemies_.size())) {
+                    ++active_enemy_count_;
+                }
+
+                fmt::print("Wave {} started. Active enemies: {}\n", wave_, active_enemy_count_);
+            }
+
+            update_window_title();
+        }
+    }
+
+    for (int i = 0; i < active_enemy_count_; ++i) {
+        if (rects_overlap(player_.bounds(), enemies_[i].bounds())) {
+            if (player_.try_take_damage(1)) {
+                fmt::print("Player took damage. HP: {}\n", player_.hp());
+                enemies_[i].respawn();
+
+                if (player_.is_dead()) {
+                    game_over_ = true;
+                    fmt::print("Game Over. Press R to restart.\n");
+                }
+
+                update_window_title();
+                break;
             }
         }
     }
@@ -144,7 +182,10 @@ void App::render() {
     SDL_SetRenderDrawColor(renderer_, 20, 24, 32, 255);
     SDL_RenderClear(renderer_);
 
-    enemy_.render(renderer_);
+    for (int i = 0; i < active_enemy_count_; ++i) {
+        enemies_[i].render(renderer_);
+    }
+
     player_.render(renderer_);
     render_hp_bar();
 
@@ -204,9 +245,55 @@ void App::render_game_over_overlay() {
 
 void App::restart_game() {
     player_.reset();
-    enemy_.respawn();
+
+    wave_ = 1;
+    kills_total_ = 0;
+    kills_in_wave_ = 0;
+    score_ = 0;
+    active_enemy_count_ = 1;
     game_over_ = false;
+
+    for (auto& enemy : enemies_) {
+        enemy.respawn();
+    }
+
+    update_window_title();
     fmt::print("Game restarted.\n");
+}
+
+void App::initialize_enemies() {
+    enemies_.clear();
+
+    enemies_.emplace_back(920.0f, 180.0f);
+    enemies_.emplace_back(1080.0f, 540.0f);
+    enemies_.emplace_back(160.0f, 120.0f);
+    enemies_.emplace_back(180.0f, 560.0f);
+    enemies_.emplace_back(620.0f, 80.0f);
+}
+
+void App::update_window_title() {
+    std::string title;
+
+    if (game_over_) {
+        title = fmt::format(
+            "Expanding Arena Roguelite | GAME OVER | Wave {} | Kills {} | Score {} | Press R to Restart",
+            wave_,
+            kills_total_,
+            score_
+        );
+    } else {
+        title = fmt::format(
+            "Expanding Arena Roguelite | HP {}/{} | Wave {} | Kills {} | Score {} | Enemies {}",
+            player_.hp(),
+            player_.max_hp(),
+            wave_,
+            kills_total_,
+            score_,
+            active_enemy_count_
+        );
+    }
+
+    SDL_SetWindowTitle(window_, title.c_str());
 }
 
 } // namespace ear
