@@ -1,6 +1,7 @@
 #include "ear/App.hpp"
 
 #include <fmt/core.h>
+#include <algorithm>
 #include <chrono>
 #include <iostream>
 
@@ -14,8 +15,8 @@ bool App::initialize() {
 
     window_ = SDL_CreateWindow(
         "Expanding Arena Roguelite",
-        1280,
-        720,
+        window_width_,
+        window_height_,
         0
     );
 
@@ -55,7 +56,7 @@ int App::run() {
         update(delta.count());
         render();
 
-        SDL_Delay(16);
+        SDL_Delay(1);
     }
 
     return 0;
@@ -82,21 +83,80 @@ void App::handle_events() {
         if (event.type == SDL_EVENT_QUIT) {
             running_ = false;
         }
+
+        if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat) {
+            switch (event.key.key) {
+                case SDLK_ESCAPE:
+                    running_ = false;
+                    break;
+                case SDLK_W:
+                case SDLK_UP:
+                    move_up_ = true;
+                    break;
+                case SDLK_S:
+                case SDLK_DOWN:
+                    move_down_ = true;
+                    break;
+                case SDLK_A:
+                case SDLK_LEFT:
+                    move_left_ = true;
+                    break;
+                case SDLK_D:
+                case SDLK_RIGHT:
+                    move_right_ = true;
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        if (event.type == SDL_EVENT_KEY_UP) {
+            switch (event.key.key) {
+                case SDLK_W:
+                case SDLK_UP:
+                    move_up_ = false;
+                    break;
+                case SDLK_S:
+                case SDLK_DOWN:
+                    move_down_ = false;
+                    break;
+                case SDLK_A:
+                case SDLK_LEFT:
+                    move_left_ = false;
+                    break;
+                case SDLK_D:
+                case SDLK_RIGHT:
+                    move_right_ = false;
+                    break;
+                default:
+                    break;
+            }
+        }
     }
 }
 
 void App::update(float dt_seconds) {
-    player_x_ += static_cast<float>(direction_) * player_speed_ * dt_seconds;
+    float dx = 0.0f;
+    float dy = 0.0f;
 
-    if (player_x_ <= 40.0f) {
-        player_x_ = 40.0f;
-        direction_ = 1;
+    if (move_up_) {
+        dy -= 1.0f;
+    }
+    if (move_down_) {
+        dy += 1.0f;
+    }
+    if (move_left_) {
+        dx -= 1.0f;
+    }
+    if (move_right_) {
+        dx += 1.0f;
     }
 
-    if (player_x_ >= 1190.0f) {
-        player_x_ = 1190.0f;
-        direction_ = -1;
-    }
+    player_x_ += dx * player_speed_ * dt_seconds;
+    player_y_ += dy * player_speed_ * dt_seconds;
+
+    player_x_ = std::clamp(player_x_, 0.0f, static_cast<float>(window_width_) - player_size_);
+    player_y_ = std::clamp(player_y_, 0.0f, static_cast<float>(window_height_) - player_size_);
 }
 
 void App::render() {
