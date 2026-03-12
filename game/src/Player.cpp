@@ -116,6 +116,7 @@ void Player::on_key_up(SDL_Keycode key) {
 void Player::update(float dt_seconds, int window_width, int window_height) {
     attack_timer_ = std::max(0.0f, attack_timer_ - dt_seconds);
     attack_cooldown_timer_ = std::max(0.0f, attack_cooldown_timer_ - dt_seconds);
+    ranged_cooldown_timer_ = std::max(0.0f, ranged_cooldown_timer_ - dt_seconds);
 
     post_dash_invulnerability_timer_ =
         std::max(0.0f, post_dash_invulnerability_timer_ - dt_seconds);
@@ -332,6 +333,14 @@ float Player::dash_cooldown_ratio() const {
     return std::clamp(dash_cooldown_timer_ / dash_cooldown_duration_, 0.0f, 1.0f);
 }
 
+float Player::ranged_cooldown_ratio() const {
+    if (ranged_cooldown_duration_ <= 0.0f) {
+        return 0.0f;
+    }
+
+    return std::clamp(ranged_cooldown_timer_ / ranged_cooldown_duration_, 0.0f, 1.0f);
+}
+
 float Player::move_speed() const {
     return speed_;
 }
@@ -346,6 +355,51 @@ float Player::dash_cooldown_seconds() const {
 
 float Player::attack_size() const {
     return attack_size_;
+}
+
+bool Player::try_begin_ranged_attack() {
+    if (ranged_cooldown_timer_ > 0.0f || is_dead() || is_dashing() || is_knocked_back()) {
+        return false;
+    }
+
+    ranged_cooldown_timer_ = ranged_cooldown_duration_;
+    return true;
+}
+
+float Player::projectile_speed() const {
+    return projectile_speed_;
+}
+
+float Player::projectile_lifetime() const {
+    return projectile_lifetime_;
+}
+
+float Player::projectile_size() const {
+    return projectile_size_;
+}
+
+int Player::projectile_damage() const {
+    return projectile_damage_;
+}
+
+float Player::projectile_knockback() const {
+    return projectile_knockback_;
+}
+
+float Player::projectile_spawn_x() const {
+    return center_x() - projectile_size_ * 0.5f;
+}
+
+float Player::projectile_spawn_y() const {
+    return center_y() - projectile_size_ * 0.5f;
+}
+
+float Player::facing_x() const {
+    return facing_x_;
+}
+
+float Player::facing_y() const {
+    return facing_y_;
 }
 
 void Player::increase_move_speed(float amount) {
@@ -393,6 +447,14 @@ void Player::reset() {
     attack_duration_ = 0.12f;
     attack_cooldown_duration_ = 0.25f;
     attack_size_ = 36.0f;
+
+    ranged_cooldown_timer_ = 0.0f;
+    ranged_cooldown_duration_ = 0.55f;
+    projectile_speed_ = 620.0f;
+    projectile_lifetime_ = 0.95f;
+    projectile_size_ = 18.0f;
+    projectile_damage_ = 1;
+    projectile_knockback_ = 260.0f;
 
     dash_timer_ = 0.0f;
     dash_cooldown_timer_ = 0.0f;

@@ -31,11 +31,23 @@ public:
 
     float attack_cooldown_ratio() const;
     float dash_cooldown_ratio() const;
+    float ranged_cooldown_ratio() const;
 
     float move_speed() const;
     float dash_speed() const;
     float dash_cooldown_seconds() const;
     float attack_size() const;
+
+    bool try_begin_ranged_attack();
+    float projectile_speed() const;
+    float projectile_lifetime() const;
+    float projectile_size() const;
+    int projectile_damage() const;
+    float projectile_knockback() const;
+    float projectile_spawn_x() const;
+    float projectile_spawn_y() const;
+    float facing_x() const;
+    float facing_y() const;
 
     void increase_move_speed(float amount);
     void increase_max_hp(int amount);
@@ -67,6 +79,14 @@ private:
     float attack_duration_ = 0.12f;
     float attack_cooldown_duration_ = 0.25f;
     float attack_size_ = 36.0f;
+
+    float ranged_cooldown_timer_ = 0.0f;
+    float ranged_cooldown_duration_ = 0.55f;
+    float projectile_speed_ = 620.0f;
+    float projectile_lifetime_ = 0.95f;
+    float projectile_size_ = 18.0f;
+    int projectile_damage_ = 1;
+    float projectile_knockback_ = 260.0f;
 
     float dash_timer_ = 0.0f;
     float dash_cooldown_timer_ = 0.0f;

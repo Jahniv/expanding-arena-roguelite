@@ -141,7 +141,11 @@ void App::handle_events() {
                     }
                 }
             } else {
-                player_.on_key_down(event.key.key, event.key.repeat);
+                if (event.key.key == SDLK_E && !event.key.repeat) {
+                    spawn_player_projectile();
+                } else {
+                    player_.on_key_down(event.key.key, event.key.repeat);
+                }
             }
         }
 
@@ -159,6 +163,81 @@ void App::update(float dt_seconds) {
     player_.update(dt_seconds, window_width_, window_height_);
 
     spawn_enemies_if_needed(dt_seconds);
+
+    for (std::size_t i = 0; i < projectiles_.size();) {
+        projectiles_[i].update(dt_seconds, window_width_, window_height_);
+
+        if (!projectiles_[i].is_alive()) {
+            projectiles_.erase(projectiles_.begin() + static_cast<long>(i));
+            continue;
+        }
+
+        bool projectile_consumed = false;
+
+        for (std::size_t j = 0; j < enemies_.size(); ++j) {
+            if (!rects_overlap(projectiles_[i].bounds(), enemies_[j].bounds())) {
+                continue;
+            }
+
+            const SDL_FRect enemy_rect = enemies_[j].bounds();
+            const SDL_FRect projectile_rect = projectiles_[i].bounds();
+
+            const float enemy_center_x = enemy_rect.x + enemy_rect.w * 0.5f;
+            const float enemy_center_y = enemy_rect.y + enemy_rect.h * 0.5f;
+            const float projectile_center_x = projectile_rect.x + projectile_rect.w * 0.5f;
+            const float projectile_center_y = projectile_rect.y + projectile_rect.h * 0.5f;
+
+            const float dir_x = enemy_center_x - projectile_center_x;
+            const float dir_y = enemy_center_y - projectile_center_y;
+
+            if (enemies_[j].take_damage(
+                    projectiles_[i].damage(),
+                    dir_x,
+                    dir_y,
+                    projectiles_[i].knockback_strength())) {
+                projectiles_[i].deactivate();
+                projectile_consumed = true;
+
+                if (enemies_[j].is_dead()) {
+                    const int base_score = enemies_[j].score_value();
+                    const int gained_score =
+                        base_score + (base_score * score_bonus_percent_) / 100;
+
+                    enemies_.erase(enemies_.begin() + static_cast<long>(j));
+
+                    ++kills_total_;
+                    ++enemies_killed_in_wave_;
+                    score_ += gained_score;
+
+                    fmt::print(
+                        "Projectile kill {} | +{} score | Total {} | Wave {} | Wave progress {}/{}\n",
+                        kills_total_,
+                        gained_score,
+                        score_,
+                        wave_,
+                        enemies_killed_in_wave_,
+                        enemies_to_spawn_in_wave_);
+
+                    if (enemies_killed_in_wave_ >= enemies_to_spawn_in_wave_) {
+                        start_upgrade_selection();
+                        update_window_title();
+                        return;
+                    }
+
+                    update_window_title();
+                }
+
+                break;
+            }
+        }
+
+        if (projectile_consumed || !projectiles_[i].is_alive()) {
+            projectiles_.erase(projectiles_.begin() + static_cast<long>(i));
+            continue;
+        }
+
+        ++i;
+    }
 
     const float enemy_speed_multiplier =
         std::min(1.0f + 0.03f * static_cast<float>(wave_ - 1), 1.18f);
@@ -249,6 +328,10 @@ void App::render() {
         enemy.render(renderer_);
     }
 
+    for (const auto& projectile : projectiles_) {
+        projectile.render(renderer_);
+    }
+
     player_.render(renderer_);
     render_hp_bar();
     render_status_bars();
@@ -293,18 +376,22 @@ void App::render_status_bars() {
     const float bar_x = 24.0f;
     const float attack_bar_y = 56.0f;
     const float dash_bar_y = 78.0f;
+    const float ranged_bar_y = 100.0f;
     const float bar_width = 180.0f;
     const float bar_height = 12.0f;
 
     const SDL_FRect attack_bg{ bar_x, attack_bar_y, bar_width, bar_height };
     const SDL_FRect dash_bg{ bar_x, dash_bar_y, bar_width, bar_height };
+    const SDL_FRect ranged_bg{ bar_x, ranged_bar_y, bar_width, bar_height };
 
     SDL_SetRenderDrawColor(renderer_, 55, 55, 55, 255);
     SDL_RenderFillRect(renderer_, &attack_bg);
     SDL_RenderFillRect(renderer_, &dash_bg);
+    SDL_RenderFillRect(renderer_, &ranged_bg);
 
     const float attack_ready_ratio = 1.0f - player_.attack_cooldown_ratio();
     const float dash_ready_ratio = 1.0f - player_.dash_cooldown_ratio();
+    const float ranged_ready_ratio = 1.0f - player_.ranged_cooldown_ratio();
 
     const SDL_FRect attack_fill{
         bar_x,
@@ -320,11 +407,21 @@ void App::render_status_bars() {
         bar_height
     };
 
+    const SDL_FRect ranged_fill{
+        bar_x,
+        ranged_bar_y,
+        bar_width * std::clamp(ranged_ready_ratio, 0.0f, 1.0f),
+        bar_height
+    };
+
     SDL_SetRenderDrawColor(renderer_, 230, 200, 70, 255);
     SDL_RenderFillRect(renderer_, &attack_fill);
 
     SDL_SetRenderDrawColor(renderer_, 170, 120, 255, 255);
     SDL_RenderFillRect(renderer_, &dash_fill);
+
+    SDL_SetRenderDrawColor(renderer_, 120, 220, 220, 255);
+    SDL_RenderFillRect(renderer_, &ranged_fill);
 }
 
 void App::render_upgrade_overlay() {
@@ -389,6 +486,7 @@ void App::render_game_over_overlay() {
 
 void App::restart_game() {
     player_.reset();
+    projectiles_.clear();
 
     kills_total_ = 0;
     score_ = 0;
@@ -440,6 +538,7 @@ void App::update_window_title() {
 void App::start_upgrade_selection() {
     choosing_upgrade_ = true;
     enemies_.clear();
+    projectiles_.clear();
     roll_upgrade_choices();
 
     fmt::print("\nWave {} cleared. Choose an upgrade:\n", wave_);
@@ -525,6 +624,7 @@ std::string App::upgrade_description(const UpgradeChoice& choice) const {
 void App::begin_wave(int wave_number) {
     wave_ = wave_number;
     enemies_.clear();
+    projectiles_.clear();
 
     enemies_to_spawn_in_wave_ = total_enemies_for_wave(wave_);
     enemies_spawned_in_wave_ = 0;
@@ -633,6 +733,26 @@ EnemyType App::next_enemy_type_for_wave() const {
     }
 
     return EnemyType::Chaser;
+}
+
+void App::spawn_player_projectile() {
+    if (!player_.try_begin_ranged_attack()) {
+        return;
+    }
+
+    projectiles_.emplace_back(
+        player_.projectile_spawn_x(),
+        player_.projectile_spawn_y(),
+        player_.facing_x(),
+        player_.facing_y(),
+        player_.projectile_speed(),
+        player_.projectile_lifetime(),
+        player_.projectile_size(),
+        player_.projectile_damage(),
+        player_.projectile_knockback(),
+        SDL_Color{140, 230, 230, 255});
+
+    update_window_title();
 }
 
 } // namespace ear

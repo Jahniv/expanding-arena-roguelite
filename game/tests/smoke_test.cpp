@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include "ear/Player.hpp"
+#include "ear/Projectile.hpp"
 
 TEST_CASE("player starts with full HP") {
     ear::Player player;
@@ -71,4 +72,33 @@ TEST_CASE("player can enter knockback state") {
     player.update(0.25f, 1280, 720);
 
     REQUIRE_FALSE(player.is_knocked_back());
+}
+
+TEST_CASE("player ranged attack enters cooldown") {
+    ear::Player player;
+
+    REQUIRE(player.try_begin_ranged_attack());
+    REQUIRE(player.ranged_cooldown_ratio() > 0.0f);
+    REQUIRE_FALSE(player.try_begin_ranged_attack());
+
+    player.update(1.0f, 1280, 720);
+
+    REQUIRE(player.try_begin_ranged_attack());
+}
+
+TEST_CASE("projectile expires after lifetime") {
+    ear::Projectile projectile(
+        0.0f, 0.0f,
+        1.0f, 0.0f,
+        100.0f,
+        0.10f,
+        10.0f,
+        1,
+        100.0f);
+
+    REQUIRE(projectile.is_alive());
+
+    projectile.update(0.20f, 1280, 720);
+
+    REQUIRE_FALSE(projectile.is_alive());
 }

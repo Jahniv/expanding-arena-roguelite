@@ -9,6 +9,7 @@
 
 #include "ear/Enemy.hpp"
 #include "ear/Player.hpp"
+#include "ear/Projectile.hpp"
 
 namespace ear {
 
@@ -60,6 +61,8 @@ private:
     int concurrent_enemies_for_wave(int wave_number) const;
     EnemyType next_enemy_type_for_wave() const;
 
+    void spawn_player_projectile();
+
     SDL_Window* window_ = nullptr;
     SDL_Renderer* renderer_ = nullptr;
     bool running_ = false;
@@ -68,6 +71,7 @@ private:
 
     Player player_;
     std::vector<Enemy> enemies_;
+    std::vector<Projectile> projectiles_;
     std::array<UpgradeChoice, 3> current_upgrade_choices_{};
 
     int wave_ = 1;
