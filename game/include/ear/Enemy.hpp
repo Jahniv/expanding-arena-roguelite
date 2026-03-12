@@ -20,8 +20,16 @@ public:
 
     void set_position(float x, float y);
 
+    bool take_damage(int amount, float dir_x, float dir_y, float knockback_strength);
+    void apply_knockback(float dir_x, float dir_y, float strength, float duration = 0.12f);
+
+    bool is_dead() const;
+    bool is_invulnerable() const;
+
     EnemyType type() const;
     int score_value() const;
+    int hp() const;
+    int max_hp() const;
 
 private:
     EnemyType type_ = EnemyType::Chaser;
@@ -30,6 +38,16 @@ private:
     float y_ = 180.0f;
     float size_ = 44.0f;
     float base_speed_ = 105.0f;
+
+    float hit_invulnerability_timer_ = 0.0f;
+    float hit_invulnerability_duration_ = 0.20f;
+
+    float knockback_timer_ = 0.0f;
+    float knockback_velocity_x_ = 0.0f;
+    float knockback_velocity_y_ = 0.0f;
+
+    int hp_ = 2;
+    int max_hp_ = 2;
 };
 
 } // namespace ear

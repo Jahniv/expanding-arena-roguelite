@@ -60,3 +60,15 @@ TEST_CASE("player stat upgrades modify values") {
     REQUIRE(player.max_hp() == base_max_hp + 1);
     REQUIRE(player.hp() == player.max_hp());
 }
+
+TEST_CASE("player can enter knockback state") {
+    ear::Player player;
+
+    player.apply_knockback(1.0f, 0.0f, 200.0f, 0.20f);
+
+    REQUIRE(player.is_knocked_back());
+
+    player.update(0.25f, 1280, 720);
+
+    REQUIRE_FALSE(player.is_knocked_back());
+}

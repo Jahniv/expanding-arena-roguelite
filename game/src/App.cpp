@@ -161,40 +161,54 @@ void App::update(float dt_seconds) {
     spawn_enemies_if_needed(dt_seconds);
 
     const float enemy_speed_multiplier =
-        std::min(1.0f + 0.04f * static_cast<float>(wave_ - 1), 1.30f);
+        std::min(1.0f + 0.03f * static_cast<float>(wave_ - 1), 1.18f);
 
     for (auto& enemy : enemies_) {
         enemy.update(player_.center_x(), player_.center_y(), dt_seconds, enemy_speed_multiplier);
     }
 
     for (std::size_t i = 0; i < enemies_.size();) {
-        if (player_.attack_hits(enemies_[i].bounds())) {
-            const int base_score = enemies_[i].score_value();
-            const int gained_score = base_score + (base_score * score_bonus_percent_) / 100;
+        SDL_FRect enemy_rect = enemies_[i].bounds();
 
-            enemies_.erase(enemies_.begin() + static_cast<long>(i));
+        if (player_.attack_hits(enemy_rect)) {
+            const float enemy_center_x = enemy_rect.x + enemy_rect.w * 0.5f;
+            const float enemy_center_y = enemy_rect.y + enemy_rect.h * 0.5f;
+            const float dir_x = enemy_center_x - player_.center_x();
+            const float dir_y = enemy_center_y - player_.center_y();
+            const float knockback_strength =
+                enemies_[i].type() == EnemyType::Brute ? 260.0f : 360.0f;
 
-            ++kills_total_;
-            ++enemies_killed_in_wave_;
-            score_ += gained_score;
+            if (enemies_[i].take_damage(1, dir_x, dir_y, knockback_strength)) {
+                if (enemies_[i].is_dead()) {
+                    const int base_score = enemies_[i].score_value();
+                    const int gained_score =
+                        base_score + (base_score * score_bonus_percent_) / 100;
 
-            fmt::print(
-                "Kill {} | +{} score | Total {} | Wave {} | Wave progress {}/{}\n",
-                kills_total_,
-                gained_score,
-                score_,
-                wave_,
-                enemies_killed_in_wave_,
-                enemies_to_spawn_in_wave_);
+                    enemies_.erase(enemies_.begin() + static_cast<long>(i));
 
-            if (enemies_killed_in_wave_ >= enemies_to_spawn_in_wave_) {
-                start_upgrade_selection();
-                update_window_title();
-                return;
+                    ++kills_total_;
+                    ++enemies_killed_in_wave_;
+                    score_ += gained_score;
+
+                    fmt::print(
+                        "Kill {} | +{} score | Total {} | Wave {} | Wave progress {}/{}\n",
+                        kills_total_,
+                        gained_score,
+                        score_,
+                        wave_,
+                        enemies_killed_in_wave_,
+                        enemies_to_spawn_in_wave_);
+
+                    if (enemies_killed_in_wave_ >= enemies_to_spawn_in_wave_) {
+                        start_upgrade_selection();
+                        update_window_title();
+                        return;
+                    }
+
+                    update_window_title();
+                    continue;
+                }
             }
-
-            update_window_title();
-            continue;
         }
 
         ++i;
@@ -203,10 +217,17 @@ void App::update(float dt_seconds) {
     for (auto& enemy : enemies_) {
         if (rects_overlap(player_.bounds(), enemy.bounds())) {
             if (player_.try_take_damage(1)) {
-                fmt::print("Player took damage. HP: {}\n", player_.hp());
+                const SDL_FRect enemy_rect = enemy.bounds();
+                const float enemy_center_x = enemy_rect.x + enemy_rect.w * 0.5f;
+                const float enemy_center_y = enemy_rect.y + enemy_rect.h * 0.5f;
 
-                auto [x, y] = random_spawn_position();
-                enemy.set_position(x, y);
+                const float player_dir_x = player_.center_x() - enemy_center_x;
+                const float player_dir_y = player_.center_y() - enemy_center_y;
+
+                player_.apply_knockback(player_dir_x, player_dir_y, 480.0f, 0.18f);
+                enemy.apply_knockback(-player_dir_x, -player_dir_y, 220.0f, 0.10f);
+
+                fmt::print("Player took damage. HP: {}\n", player_.hp());
 
                 if (player_.is_dead()) {
                     game_over_ = true;

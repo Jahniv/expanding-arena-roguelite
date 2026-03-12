@@ -41,14 +41,15 @@ void Player::on_key_down(SDL_Keycode key, bool repeat) {
             if (attack_timer_ <= 0.0f &&
                 attack_cooldown_timer_ <= 0.0f &&
                 !is_dead() &&
-                !is_dashing()) {
+                !is_dashing() &&
+                !is_knocked_back()) {
                 attack_timer_ = attack_duration_;
                 attack_cooldown_timer_ = attack_cooldown_duration_;
             }
             break;
         case SDLK_LSHIFT:
         case SDLK_RSHIFT: {
-            if (dash_timer_ > 0.0f || dash_cooldown_timer_ > 0.0f || is_dead()) {
+            if (dash_timer_ > 0.0f || dash_cooldown_timer_ > 0.0f || is_dead() || is_knocked_back()) {
                 break;
             }
 
@@ -127,10 +128,21 @@ void Player::update(float dt_seconds, int window_width, int window_height) {
         post_dash_invulnerability_timer_ = post_dash_invulnerability_duration_;
     }
 
+    knockback_timer_ = std::max(0.0f, knockback_timer_ - dt_seconds);
+
     damage_invulnerability_timer_ =
         std::max(0.0f, damage_invulnerability_timer_ - dt_seconds);
 
     if (is_dead()) {
+        return;
+    }
+
+    if (is_knocked_back()) {
+        x_ += knockback_velocity_x_ * dt_seconds;
+        y_ += knockback_velocity_y_ * dt_seconds;
+
+        x_ = std::clamp(x_, 0.0f, static_cast<float>(window_width) - size_);
+        y_ = std::clamp(y_, 0.0f, static_cast<float>(window_height) - size_);
         return;
     }
 
@@ -180,6 +192,8 @@ void Player::render(SDL_Renderer* renderer) const {
 
     if (is_dashing()) {
         SDL_SetRenderDrawColor(renderer, 210, 160, 255, 255);
+    } else if (is_knocked_back()) {
+        SDL_SetRenderDrawColor(renderer, 255, 180, 120, 255);
     } else if (post_dash_invulnerability_timer_ > 0.0f) {
         SDL_SetRenderDrawColor(renderer, 200, 180, 255, 255);
     } else if (damage_invulnerability_timer_ > 0.0f) {
@@ -251,6 +265,10 @@ bool Player::is_dashing() const {
     return dash_timer_ > 0.0f;
 }
 
+bool Player::is_knocked_back() const {
+    return knockback_timer_ > 0.0f;
+}
+
 bool Player::attack_hits(const SDL_FRect& target) const {
     if (!is_attacking()) {
         return false;
@@ -265,8 +283,19 @@ bool Player::try_take_damage(int amount) {
     }
 
     hp_ = std::max(0, hp_ - amount);
-    damage_invulnerability_timer_ = 0.70f;
+    damage_invulnerability_timer_ = damage_invulnerability_duration_;
     return true;
+}
+
+void Player::apply_knockback(float dir_x, float dir_y, float strength, float duration) {
+    const float length = std::sqrt(dir_x * dir_x + dir_y * dir_y);
+    if (length <= 0.001f) {
+        return;
+    }
+
+    knockback_velocity_x_ = (dir_x / length) * strength;
+    knockback_velocity_y_ = (dir_y / length) * strength;
+    knockback_timer_ = duration;
 }
 
 bool Player::is_dead() const {
@@ -373,8 +402,13 @@ void Player::reset() {
     dash_dir_x_ = 1.0f;
     dash_dir_y_ = 0.0f;
 
+    knockback_timer_ = 0.0f;
+    knockback_velocity_x_ = 0.0f;
+    knockback_velocity_y_ = 0.0f;
+
     post_dash_invulnerability_timer_ = 0.0f;
     damage_invulnerability_timer_ = 0.0f;
+    damage_invulnerability_duration_ = 1.00f;
 
     hp_ = max_hp_ = 5;
 }

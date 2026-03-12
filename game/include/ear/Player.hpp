@@ -17,9 +17,12 @@ public:
 
     bool is_attacking() const;
     bool is_dashing() const;
+    bool is_knocked_back() const;
     bool attack_hits(const SDL_FRect& target) const;
 
     bool try_take_damage(int amount);
+    void apply_knockback(float dir_x, float dir_y, float strength, float duration = 0.16f);
+
     bool is_dead() const;
     bool is_invulnerable() const;
 
@@ -73,10 +76,15 @@ private:
     float dash_dir_x_ = 1.0f;
     float dash_dir_y_ = 0.0f;
 
+    float knockback_timer_ = 0.0f;
+    float knockback_velocity_x_ = 0.0f;
+    float knockback_velocity_y_ = 0.0f;
+
     float post_dash_invulnerability_timer_ = 0.0f;
     float post_dash_invulnerability_duration_ = 0.10f;
 
     float damage_invulnerability_timer_ = 0.0f;
+    float damage_invulnerability_duration_ = 1.00f;
 
     int hp_ = 5;
     int max_hp_ = 5;
