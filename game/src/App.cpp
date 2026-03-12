@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <iostream>
 #include <string>
 
@@ -70,8 +71,7 @@ bool App::initialize() {
 
     SDL_SetRenderDrawBlendMode(renderer_, SDL_BLENDMODE_BLEND);
 
-    initialize_enemies();
-    update_window_title();
+    restart_game();
 
     running_ = true;
 
@@ -158,39 +158,55 @@ void App::update(float dt_seconds) {
 
     player_.update(dt_seconds, window_width_, window_height_);
 
-    const float enemy_speed_multiplier = std::min(1.0f + 0.06f * static_cast<float>(wave_ - 1), 1.45f);
+    spawn_enemies_if_needed(dt_seconds);
 
-    for (int i = 0; i < active_enemy_count_; ++i) {
-        enemies_[i].update(player_.center_x(), player_.center_y(), dt_seconds, enemy_speed_multiplier);
+    const float enemy_speed_multiplier =
+        std::min(1.0f + 0.04f * static_cast<float>(wave_ - 1), 1.30f);
+
+    for (auto& enemy : enemies_) {
+        enemy.update(player_.center_x(), player_.center_y(), dt_seconds, enemy_speed_multiplier);
     }
 
-    for (int i = 0; i < active_enemy_count_; ++i) {
+    for (std::size_t i = 0; i < enemies_.size();) {
         if (player_.attack_hits(enemies_[i].bounds())) {
             const int base_score = enemies_[i].score_value();
             const int gained_score = base_score + (base_score * score_bonus_percent_) / 100;
-            enemies_[i].respawn();
+
+            enemies_.erase(enemies_.begin() + static_cast<long>(i));
 
             ++kills_total_;
-            ++kills_in_wave_;
+            ++enemies_killed_in_wave_;
             score_ += gained_score;
 
-            fmt::print("Kill {} | +{} score | Total {} | Wave {}\n", kills_total_, gained_score, score_, wave_);
+            fmt::print(
+                "Kill {} | +{} score | Total {} | Wave {} | Wave progress {}/{}\n",
+                kills_total_,
+                gained_score,
+                score_,
+                wave_,
+                enemies_killed_in_wave_,
+                enemies_to_spawn_in_wave_);
 
-            if (kills_in_wave_ >= kills_per_wave_) {
+            if (enemies_killed_in_wave_ >= enemies_to_spawn_in_wave_) {
                 start_upgrade_selection();
                 update_window_title();
                 return;
             }
 
             update_window_title();
+            continue;
         }
+
+        ++i;
     }
 
-    for (int i = 0; i < active_enemy_count_; ++i) {
-        if (rects_overlap(player_.bounds(), enemies_[i].bounds())) {
+    for (auto& enemy : enemies_) {
+        if (rects_overlap(player_.bounds(), enemy.bounds())) {
             if (player_.try_take_damage(1)) {
                 fmt::print("Player took damage. HP: {}\n", player_.hp());
-                enemies_[i].respawn();
+
+                auto [x, y] = random_spawn_position();
+                enemy.set_position(x, y);
 
                 if (player_.is_dead()) {
                     game_over_ = true;
@@ -208,8 +224,8 @@ void App::render() {
     SDL_SetRenderDrawColor(renderer_, 20, 24, 32, 255);
     SDL_RenderClear(renderer_);
 
-    for (int i = 0; i < active_enemy_count_; ++i) {
-        enemies_[i].render(renderer_);
+    for (const auto& enemy : enemies_) {
+        enemy.render(renderer_);
     }
 
     player_.render(renderer_);
@@ -353,32 +369,15 @@ void App::render_game_over_overlay() {
 void App::restart_game() {
     player_.reset();
 
-    wave_ = 1;
     kills_total_ = 0;
-    kills_in_wave_ = 0;
     score_ = 0;
-    active_enemy_count_ = 1;
     score_bonus_percent_ = 0;
     upgrade_roll_counter_ = 0;
     choosing_upgrade_ = false;
     game_over_ = false;
 
-    for (auto& enemy : enemies_) {
-        enemy.respawn();
-    }
-
-    update_window_title();
+    begin_wave(1);
     fmt::print("Game restarted.\n");
-}
-
-void App::initialize_enemies() {
-    enemies_.clear();
-
-    enemies_.emplace_back(920.0f, 180.0f, EnemyType::Chaser);
-    enemies_.emplace_back(1080.0f, 540.0f, EnemyType::Chaser);
-    enemies_.emplace_back(160.0f, 120.0f, EnemyType::Brute);
-    enemies_.emplace_back(180.0f, 560.0f, EnemyType::Chaser);
-    enemies_.emplace_back(620.0f, 80.0f, EnemyType::Brute);
 }
 
 void App::update_window_title() {
@@ -399,14 +398,17 @@ void App::update_window_title() {
             current_upgrade_choices_[2].name
         );
     } else {
+        const int remaining_to_kill = enemies_to_spawn_in_wave_ - enemies_killed_in_wave_;
+
         title = fmt::format(
-            "Expanding Arena Roguelite | HP {}/{} | Wave {} | Kills {} | Score {} | Enemies {} | Bonus {}%",
+            "Expanding Arena Roguelite | HP {}/{} | Wave {} | Kills {} | Score {} | Alive {} | Remaining {} | Bonus {}%",
             player_.hp(),
             player_.max_hp(),
             wave_,
             kills_total_,
             score_,
-            active_enemy_count_,
+            static_cast<int>(enemies_.size()),
+            remaining_to_kill,
             score_bonus_percent_
         );
     }
@@ -416,6 +418,7 @@ void App::update_window_title() {
 
 void App::start_upgrade_selection() {
     choosing_upgrade_ = true;
+    enemies_.clear();
     roll_upgrade_choices();
 
     fmt::print("\nWave {} cleared. Choose an upgrade:\n", wave_);
@@ -430,18 +433,8 @@ void App::apply_upgrade_by_index(int index) {
     }
 
     apply_upgrade(current_upgrade_choices_[index]);
-
-    ++wave_;
-    kills_in_wave_ = 0;
-
-    if (active_enemy_count_ < static_cast<int>(enemies_.size())) {
-        ++active_enemy_count_;
-    }
-
     choosing_upgrade_ = false;
-
-    fmt::print("Wave {} started. Active enemies: {}\n", wave_, active_enemy_count_);
-    update_window_title();
+    begin_wave(wave_ + 1);
 }
 
 void App::roll_upgrade_choices() {
@@ -506,6 +499,119 @@ std::string App::upgrade_description(const UpgradeChoice& choice) const {
     }
 
     return "Unknown upgrade";
+}
+
+void App::begin_wave(int wave_number) {
+    wave_ = wave_number;
+    enemies_.clear();
+
+    enemies_to_spawn_in_wave_ = total_enemies_for_wave(wave_);
+    enemies_spawned_in_wave_ = 0;
+    enemies_killed_in_wave_ = 0;
+    spawn_timer_ = 0.0f;
+
+    const int initial_spawn_target = concurrent_enemies_for_wave(wave_);
+    while (static_cast<int>(enemies_.size()) < initial_spawn_target &&
+           enemies_spawned_in_wave_ < enemies_to_spawn_in_wave_) {
+        spawn_one_enemy();
+    }
+
+    fmt::print(
+        "Wave {} started. Total enemies: {} | Concurrent cap: {}\n",
+        wave_,
+        enemies_to_spawn_in_wave_,
+        concurrent_enemies_for_wave(wave_));
+
+    update_window_title();
+}
+
+void App::spawn_enemies_if_needed(float dt_seconds) {
+    if (enemies_spawned_in_wave_ >= enemies_to_spawn_in_wave_) {
+        return;
+    }
+
+    const int concurrent_cap = concurrent_enemies_for_wave(wave_);
+    if (static_cast<int>(enemies_.size()) >= concurrent_cap) {
+        return;
+    }
+
+    spawn_timer_ -= dt_seconds;
+    if (spawn_timer_ > 0.0f) {
+        return;
+    }
+
+    spawn_one_enemy();
+    spawn_timer_ = spawn_interval_seconds_;
+    update_window_title();
+}
+
+void App::spawn_one_enemy() {
+    auto [x, y] = random_spawn_position();
+    enemies_.emplace_back(x, y, next_enemy_type_for_wave());
+    ++enemies_spawned_in_wave_;
+}
+
+std::pair<float, float> App::random_spawn_position() {
+    std::uniform_int_distribution<int> side_dist(0, 3);
+    std::uniform_real_distribution<float> x_dist(40.0f, window_width_ - 100.0f);
+    std::uniform_real_distribution<float> y_dist(40.0f, window_height_ - 100.0f);
+
+    const float min_distance = 240.0f;
+    const float player_x = player_.center_x();
+    const float player_y = player_.center_y();
+
+    for (int attempt = 0; attempt < 32; ++attempt) {
+        const int side = side_dist(rng_);
+        float x = 0.0f;
+        float y = 0.0f;
+
+        switch (side) {
+            case 0:
+                x = x_dist(rng_);
+                y = 40.0f;
+                break;
+            case 1:
+                x = x_dist(rng_);
+                y = window_height_ - 100.0f;
+                break;
+            case 2:
+                x = 40.0f;
+                y = y_dist(rng_);
+                break;
+            default:
+                x = window_width_ - 100.0f;
+                y = y_dist(rng_);
+                break;
+        }
+
+        const float dx = x - player_x;
+        const float dy = y - player_y;
+        if (std::sqrt(dx * dx + dy * dy) >= min_distance) {
+            return { x, y };
+        }
+    }
+
+    return { 40.0f, 40.0f };
+}
+
+int App::total_enemies_for_wave(int wave_number) const {
+    return 2 * wave_number + 2;
+}
+
+int App::concurrent_enemies_for_wave(int wave_number) const {
+    return std::min(2 + wave_number / 2, 5);
+}
+
+EnemyType App::next_enemy_type_for_wave() const {
+    if (wave_ >= 3 && (enemies_spawned_in_wave_ + 1) % 4 == 0) {
+        return EnemyType::Brute;
+    }
+
+    if (wave_ >= 5 && (enemies_spawned_in_wave_ + 1) % 3 == 0) {
+        return EnemyType::Brute;
+    }
+
+    return EnemyType::Chaser;
 }
 
 } // namespace ear

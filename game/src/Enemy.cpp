@@ -4,18 +4,14 @@
 
 namespace ear {
 
-Enemy::Enemy(float spawn_x, float spawn_y, EnemyType type)
-    : type_(type),
-      spawn_x_(spawn_x),
-      spawn_y_(spawn_y),
-      x_(spawn_x),
-      y_(spawn_y) {
+Enemy::Enemy(float x, float y, EnemyType type)
+    : type_(type), x_(x), y_(y) {
     if (type_ == EnemyType::Brute) {
         size_ = 62.0f;
-        base_speed_ = 82.0f;
+        base_speed_ = 72.0f;
     } else {
         size_ = 44.0f;
-        base_speed_ = 120.0f;
+        base_speed_ = 105.0f;
     }
 }
 
@@ -53,9 +49,9 @@ SDL_FRect Enemy::bounds() const {
     return SDL_FRect{ x_, y_, size_, size_ };
 }
 
-void Enemy::respawn() {
-    x_ = spawn_x_;
-    y_ = spawn_y_;
+void Enemy::set_position(float x, float y) {
+    x_ = x;
+    y_ = y;
 }
 
 EnemyType Enemy::type() const {
