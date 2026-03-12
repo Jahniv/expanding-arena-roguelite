@@ -29,6 +29,17 @@ public:
     float attack_cooldown_ratio() const;
     float dash_cooldown_ratio() const;
 
+    float move_speed() const;
+    float dash_speed() const;
+    float dash_cooldown_seconds() const;
+    float attack_size() const;
+
+    void increase_move_speed(float amount);
+    void increase_max_hp(int amount);
+    void reduce_dash_cooldown_multiplier(float multiplier);
+    void increase_dash_speed(float amount);
+    void increase_attack_size(float amount);
+
     void reset();
 
     float center_x() const;
@@ -52,6 +63,7 @@ private:
     float attack_cooldown_timer_ = 0.0f;
     float attack_duration_ = 0.12f;
     float attack_cooldown_duration_ = 0.25f;
+    float attack_size_ = 36.0f;
 
     float dash_timer_ = 0.0f;
     float dash_cooldown_timer_ = 0.0f;

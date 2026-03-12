@@ -37,3 +37,26 @@ TEST_CASE("post dash grace keeps player invulnerable briefly") {
     REQUIRE_FALSE(player.is_dashing());
     REQUIRE(player.is_invulnerable());
 }
+
+TEST_CASE("player stat upgrades modify values") {
+    ear::Player player;
+
+    const float base_move_speed = player.move_speed();
+    const float base_dash_speed = player.dash_speed();
+    const float base_dash_cd = player.dash_cooldown_seconds();
+    const float base_attack_size = player.attack_size();
+    const int base_max_hp = player.max_hp();
+
+    player.increase_move_speed(40.0f);
+    player.increase_dash_speed(120.0f);
+    player.reduce_dash_cooldown_multiplier(0.85f);
+    player.increase_attack_size(10.0f);
+    player.increase_max_hp(1);
+
+    REQUIRE(player.move_speed() > base_move_speed);
+    REQUIRE(player.dash_speed() > base_dash_speed);
+    REQUIRE(player.dash_cooldown_seconds() < base_dash_cd);
+    REQUIRE(player.attack_size() > base_attack_size);
+    REQUIRE(player.max_hp() == base_max_hp + 1);
+    REQUIRE(player.hp() == player.max_hp());
+}

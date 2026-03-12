@@ -18,6 +18,25 @@ bool rects_overlap(const SDL_FRect& a, const SDL_FRect& b) {
            (a.y + a.h) > b.y;
 }
 
+UpgradeChoice make_choice(UpgradeType type) {
+    switch (type) {
+        case UpgradeType::MoveSpeed:
+            return UpgradeChoice{ type, "Move Speed +40", SDL_Color{ 70, 170, 255, 255 } };
+        case UpgradeType::MaxHp:
+            return UpgradeChoice{ type, "Max HP +1", SDL_Color{ 220, 80, 80, 255 } };
+        case UpgradeType::DashCooldown:
+            return UpgradeChoice{ type, "Dash Cooldown -15%", SDL_Color{ 170, 120, 255, 255 } };
+        case UpgradeType::DashSpeed:
+            return UpgradeChoice{ type, "Dash Speed +120", SDL_Color{ 200, 150, 255, 255 } };
+        case UpgradeType::AttackSize:
+            return UpgradeChoice{ type, "Attack Size +10", SDL_Color{ 235, 205, 90, 255 } };
+        case UpgradeType::ScoreBonus:
+            return UpgradeChoice{ type, "Score Bonus +10%", SDL_Color{ 80, 220, 170, 255 } };
+    }
+
+    return UpgradeChoice{};
+}
+
 } // namespace
 
 bool App::initialize() {
@@ -111,19 +130,29 @@ void App::handle_events() {
                 if (event.key.key == SDLK_R && !event.key.repeat) {
                     restart_game();
                 }
+            } else if (choosing_upgrade_) {
+                if (!event.key.repeat) {
+                    if (event.key.key == SDLK_1) {
+                        apply_upgrade_by_index(0);
+                    } else if (event.key.key == SDLK_2) {
+                        apply_upgrade_by_index(1);
+                    } else if (event.key.key == SDLK_3) {
+                        apply_upgrade_by_index(2);
+                    }
+                }
             } else {
                 player_.on_key_down(event.key.key, event.key.repeat);
             }
         }
 
-        if (event.type == SDL_EVENT_KEY_UP && !game_over_) {
+        if (event.type == SDL_EVENT_KEY_UP && !game_over_ && !choosing_upgrade_) {
             player_.on_key_up(event.key.key);
         }
     }
 }
 
 void App::update(float dt_seconds) {
-    if (game_over_) {
+    if (game_over_ || choosing_upgrade_) {
         return;
     }
 
@@ -137,7 +166,8 @@ void App::update(float dt_seconds) {
 
     for (int i = 0; i < active_enemy_count_; ++i) {
         if (player_.attack_hits(enemies_[i].bounds())) {
-            const int gained_score = enemies_[i].score_value();
+            const int base_score = enemies_[i].score_value();
+            const int gained_score = base_score + (base_score * score_bonus_percent_) / 100;
             enemies_[i].respawn();
 
             ++kills_total_;
@@ -147,14 +177,9 @@ void App::update(float dt_seconds) {
             fmt::print("Kill {} | +{} score | Total {} | Wave {}\n", kills_total_, gained_score, score_, wave_);
 
             if (kills_in_wave_ >= kills_per_wave_) {
-                ++wave_;
-                kills_in_wave_ = 0;
-
-                if (active_enemy_count_ < static_cast<int>(enemies_.size())) {
-                    ++active_enemy_count_;
-                }
-
-                fmt::print("Wave {} started. Active enemies: {}\n", wave_, active_enemy_count_);
+                start_upgrade_selection();
+                update_window_title();
+                return;
             }
 
             update_window_title();
@@ -190,6 +215,10 @@ void App::render() {
     player_.render(renderer_);
     render_hp_bar();
     render_status_bars();
+
+    if (choosing_upgrade_) {
+        render_upgrade_overlay();
+    }
 
     if (game_over_) {
         render_game_over_overlay();
@@ -261,6 +290,44 @@ void App::render_status_bars() {
     SDL_RenderFillRect(renderer_, &dash_fill);
 }
 
+void App::render_upgrade_overlay() {
+    const SDL_FRect full_screen{
+        0.0f,
+        0.0f,
+        static_cast<float>(window_width_),
+        static_cast<float>(window_height_)
+    };
+
+    SDL_SetRenderDrawColor(renderer_, 15, 15, 15, 150);
+    SDL_RenderFillRect(renderer_, &full_screen);
+
+    const float panel_w = 260.0f;
+    const float panel_h = 180.0f;
+    const float gap = 40.0f;
+    const float total_w = panel_w * 3.0f + gap * 2.0f;
+    const float start_x = (window_width_ - total_w) * 0.5f;
+    const float y = 250.0f;
+
+    for (int i = 0; i < 3; ++i) {
+        const float x = start_x + i * (panel_w + gap);
+        const SDL_FRect panel{ x, y, panel_w, panel_h };
+
+        const SDL_Color c = current_upgrade_choices_[i].color;
+        SDL_SetRenderDrawColor(renderer_, c.r, c.g, c.b, 220);
+        SDL_RenderFillRect(renderer_, &panel);
+
+        const SDL_FRect inner{
+            x + 8.0f,
+            y + 8.0f,
+            panel_w - 16.0f,
+            panel_h - 16.0f
+        };
+
+        SDL_SetRenderDrawColor(renderer_, 30, 30, 30, 120);
+        SDL_RenderFillRect(renderer_, &inner);
+    }
+}
+
 void App::render_game_over_overlay() {
     const SDL_FRect full_screen{
         0.0f,
@@ -291,6 +358,9 @@ void App::restart_game() {
     kills_in_wave_ = 0;
     score_ = 0;
     active_enemy_count_ = 1;
+    score_bonus_percent_ = 0;
+    upgrade_roll_counter_ = 0;
+    choosing_upgrade_ = false;
     game_over_ = false;
 
     for (auto& enemy : enemies_) {
@@ -321,19 +391,121 @@ void App::update_window_title() {
             kills_total_,
             score_
         );
+    } else if (choosing_upgrade_) {
+        title = fmt::format(
+            "Choose Upgrade: [1] {} | [2] {} | [3] {}",
+            current_upgrade_choices_[0].name,
+            current_upgrade_choices_[1].name,
+            current_upgrade_choices_[2].name
+        );
     } else {
         title = fmt::format(
-            "Expanding Arena Roguelite | HP {}/{} | Wave {} | Kills {} | Score {} | Enemies {}",
+            "Expanding Arena Roguelite | HP {}/{} | Wave {} | Kills {} | Score {} | Enemies {} | Bonus {}%",
             player_.hp(),
             player_.max_hp(),
             wave_,
             kills_total_,
             score_,
-            active_enemy_count_
+            active_enemy_count_,
+            score_bonus_percent_
         );
     }
 
     SDL_SetWindowTitle(window_, title.c_str());
+}
+
+void App::start_upgrade_selection() {
+    choosing_upgrade_ = true;
+    roll_upgrade_choices();
+
+    fmt::print("\nWave {} cleared. Choose an upgrade:\n", wave_);
+    fmt::print("  [1] {}\n", upgrade_description(current_upgrade_choices_[0]));
+    fmt::print("  [2] {}\n", upgrade_description(current_upgrade_choices_[1]));
+    fmt::print("  [3] {}\n\n", upgrade_description(current_upgrade_choices_[2]));
+}
+
+void App::apply_upgrade_by_index(int index) {
+    if (index < 0 || index >= 3 || !choosing_upgrade_) {
+        return;
+    }
+
+    apply_upgrade(current_upgrade_choices_[index]);
+
+    ++wave_;
+    kills_in_wave_ = 0;
+
+    if (active_enemy_count_ < static_cast<int>(enemies_.size())) {
+        ++active_enemy_count_;
+    }
+
+    choosing_upgrade_ = false;
+
+    fmt::print("Wave {} started. Active enemies: {}\n", wave_, active_enemy_count_);
+    update_window_title();
+}
+
+void App::roll_upgrade_choices() {
+    static constexpr std::array<UpgradeType, 6> pool = {
+        UpgradeType::MoveSpeed,
+        UpgradeType::MaxHp,
+        UpgradeType::DashCooldown,
+        UpgradeType::DashSpeed,
+        UpgradeType::AttackSize,
+        UpgradeType::ScoreBonus
+    };
+
+    const int pool_size = static_cast<int>(pool.size());
+
+    for (int i = 0; i < 3; ++i) {
+        const int idx = (upgrade_roll_counter_ + i) % pool_size;
+        current_upgrade_choices_[i] = make_choice(pool[idx]);
+    }
+
+    upgrade_roll_counter_ = (upgrade_roll_counter_ + 3) % pool_size;
+}
+
+void App::apply_upgrade(const UpgradeChoice& choice) {
+    switch (choice.type) {
+        case UpgradeType::MoveSpeed:
+            player_.increase_move_speed(40.0f);
+            break;
+        case UpgradeType::MaxHp:
+            player_.increase_max_hp(1);
+            break;
+        case UpgradeType::DashCooldown:
+            player_.reduce_dash_cooldown_multiplier(0.85f);
+            break;
+        case UpgradeType::DashSpeed:
+            player_.increase_dash_speed(120.0f);
+            break;
+        case UpgradeType::AttackSize:
+            player_.increase_attack_size(10.0f);
+            break;
+        case UpgradeType::ScoreBonus:
+            score_bonus_percent_ += 10;
+            break;
+    }
+
+    fmt::print("Applied upgrade: {}\n", upgrade_description(choice));
+}
+
+std::string App::upgrade_description(const UpgradeChoice& choice) const {
+    switch (choice.type) {
+        case UpgradeType::MoveSpeed:
+            return fmt::format("{} (current move speed: {:.0f})", choice.name, player_.move_speed());
+        case UpgradeType::MaxHp:
+            return fmt::format("{} (current HP: {}/{})", choice.name, player_.hp(), player_.max_hp());
+        case UpgradeType::DashCooldown:
+            return fmt::format("{} (current dash cooldown: {:.2f})", choice.name, player_.dash_cooldown_seconds());
+        case UpgradeType::DashSpeed:
+            return fmt::format("{} (current dash speed: {:.0f})", choice.name, player_.dash_speed());
+        case UpgradeType::AttackSize:
+            return fmt::format("{} (current attack size: {:.0f})", choice.name, player_.attack_size());
+        case UpgradeType::ScoreBonus:
+            return fmt::format("{} (current score bonus: {}%)", choice.name, score_bonus_percent_);
+    }
+
+    return "Unknown upgrade";
 }
 
 } // namespace ear

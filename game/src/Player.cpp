@@ -115,9 +115,9 @@ void Player::on_key_up(SDL_Keycode key) {
 void Player::update(float dt_seconds, int window_width, int window_height) {
     attack_timer_ = std::max(0.0f, attack_timer_ - dt_seconds);
     attack_cooldown_timer_ = std::max(0.0f, attack_cooldown_timer_ - dt_seconds);
-    
+
     post_dash_invulnerability_timer_ =
-    	std::max(0.0f, post_dash_invulnerability_timer_ - dt_seconds);
+        std::max(0.0f, post_dash_invulnerability_timer_ - dt_seconds);
 
     const float previous_dash_timer = dash_timer_;
     dash_timer_ = std::max(0.0f, dash_timer_ - dt_seconds);
@@ -128,7 +128,7 @@ void Player::update(float dt_seconds, int window_width, int window_height) {
     }
 
     damage_invulnerability_timer_ =
-    	std::max(0.0f, damage_invulnerability_timer_ - dt_seconds);
+        std::max(0.0f, damage_invulnerability_timer_ - dt_seconds);
 
     if (is_dead()) {
         return;
@@ -137,6 +137,7 @@ void Player::update(float dt_seconds, int window_width, int window_height) {
     if (is_dashing()) {
         x_ += dash_dir_x_ * dash_speed_ * dt_seconds;
         y_ += dash_dir_y_ * dash_speed_ * dt_seconds;
+
         x_ = std::clamp(x_, 0.0f, static_cast<float>(window_width) - size_);
         y_ = std::clamp(y_, 0.0f, static_cast<float>(window_height) - size_);
         return;
@@ -205,41 +206,40 @@ SDL_FRect Player::attack_bounds() const {
         return SDL_FRect{ 0.0f, 0.0f, 0.0f, 0.0f };
     }
 
-    const float attack_size = 36.0f;
     const float padding = 8.0f;
 
     if (std::abs(facing_x_) >= std::abs(facing_y_)) {
         if (facing_x_ >= 0.0f) {
             return SDL_FRect{
                 x_ + size_ + padding,
-                y_ + (size_ - attack_size) * 0.5f,
-                attack_size,
-                attack_size
+                y_ + (size_ - attack_size_) * 0.5f,
+                attack_size_,
+                attack_size_
             };
         }
 
         return SDL_FRect{
-            x_ - attack_size - padding,
-            y_ + (size_ - attack_size) * 0.5f,
-            attack_size,
-            attack_size
+            x_ - attack_size_ - padding,
+            y_ + (size_ - attack_size_) * 0.5f,
+            attack_size_,
+            attack_size_
         };
     }
 
     if (facing_y_ >= 0.0f) {
         return SDL_FRect{
-            x_ + (size_ - attack_size) * 0.5f,
+            x_ + (size_ - attack_size_) * 0.5f,
             y_ + size_ + padding,
-            attack_size,
-            attack_size
+            attack_size_,
+            attack_size_
         };
     }
 
     return SDL_FRect{
-        x_ + (size_ - attack_size) * 0.5f,
-        y_ - attack_size - padding,
-        attack_size,
-        attack_size
+        x_ + (size_ - attack_size_) * 0.5f,
+        y_ - attack_size_ - padding,
+        attack_size_,
+        attack_size_
     };
 }
 
@@ -303,6 +303,48 @@ float Player::dash_cooldown_ratio() const {
     return std::clamp(dash_cooldown_timer_ / dash_cooldown_duration_, 0.0f, 1.0f);
 }
 
+float Player::move_speed() const {
+    return speed_;
+}
+
+float Player::dash_speed() const {
+    return dash_speed_;
+}
+
+float Player::dash_cooldown_seconds() const {
+    return dash_cooldown_duration_;
+}
+
+float Player::attack_size() const {
+    return attack_size_;
+}
+
+void Player::increase_move_speed(float amount) {
+    speed_ = std::max(80.0f, speed_ + amount);
+}
+
+void Player::increase_max_hp(int amount) {
+    if (amount <= 0) {
+        return;
+    }
+
+    max_hp_ += amount;
+    hp_ += amount;
+}
+
+void Player::reduce_dash_cooldown_multiplier(float multiplier) {
+    dash_cooldown_duration_ =
+        std::clamp(dash_cooldown_duration_ * multiplier, 0.20f, 5.0f);
+}
+
+void Player::increase_dash_speed(float amount) {
+    dash_speed_ = std::max(120.0f, dash_speed_ + amount);
+}
+
+void Player::increase_attack_size(float amount) {
+    attack_size_ = std::clamp(attack_size_ + amount, 16.0f, 120.0f);
+}
+
 void Player::reset() {
     x_ = 120.0f;
     y_ = 320.0f;
@@ -319,14 +361,22 @@ void Player::reset() {
 
     attack_timer_ = 0.0f;
     attack_cooldown_timer_ = 0.0f;
+    attack_duration_ = 0.12f;
+    attack_cooldown_duration_ = 0.25f;
+    attack_size_ = 36.0f;
+
     dash_timer_ = 0.0f;
     dash_cooldown_timer_ = 0.0f;
+    dash_duration_ = 0.18f;
+    dash_cooldown_duration_ = 0.85f;
+    dash_speed_ = 860.0f;
     dash_dir_x_ = 1.0f;
     dash_dir_y_ = 0.0f;
+
     post_dash_invulnerability_timer_ = 0.0f;
     damage_invulnerability_timer_ = 0.0f;
 
-    hp_ = max_hp_;
+    hp_ = max_hp_ = 5;
 }
 
 float Player::center_x() const {
