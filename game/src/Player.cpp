@@ -200,14 +200,14 @@ void Player::render(SDL_Renderer* renderer) const {
     } else if (damage_invulnerability_timer_ > 0.0f) {
         SDL_SetRenderDrawColor(renderer, 120, 220, 255, 255);
     } else {
-        SDL_SetRenderDrawColor(renderer, 80, 200, 120, 255);
+        SDL_SetRenderDrawColor(renderer, body_color_.r, body_color_.g, body_color_.b, body_color_.a);
     }
 
     SDL_RenderFillRect(renderer, &player_rect);
 
     if (is_attacking()) {
         const SDL_FRect attack_rect = attack_bounds();
-        SDL_SetRenderDrawColor(renderer, 240, 220, 90, 255);
+        SDL_SetRenderDrawColor(renderer, attack_color_.r, attack_color_.g, attack_color_.b, attack_color_.a);
         SDL_RenderFillRect(renderer, &attack_rect);
     }
 }
@@ -222,39 +222,46 @@ SDL_FRect Player::attack_bounds() const {
     }
 
     const float padding = 8.0f;
+    const bool horizontal = std::abs(facing_x_) >= std::abs(facing_y_);
 
-    if (std::abs(facing_x_) >= std::abs(facing_y_)) {
+    if (horizontal) {
+        const float width = attack_main_size_;
+        const float height = attack_cross_size_;
+
         if (facing_x_ >= 0.0f) {
             return SDL_FRect{
                 x_ + size_ + padding,
-                y_ + (size_ - attack_size_) * 0.5f,
-                attack_size_,
-                attack_size_
+                y_ + (size_ - height) * 0.5f,
+                width,
+                height
             };
         }
 
         return SDL_FRect{
-            x_ - attack_size_ - padding,
-            y_ + (size_ - attack_size_) * 0.5f,
-            attack_size_,
-            attack_size_
+            x_ - width - padding,
+            y_ + (size_ - height) * 0.5f,
+            width,
+            height
         };
     }
 
+    const float width = attack_cross_size_;
+    const float height = attack_main_size_;
+
     if (facing_y_ >= 0.0f) {
         return SDL_FRect{
-            x_ + (size_ - attack_size_) * 0.5f,
+            x_ + (size_ - width) * 0.5f,
             y_ + size_ + padding,
-            attack_size_,
-            attack_size_
+            width,
+            height
         };
     }
 
     return SDL_FRect{
-        x_ + (size_ - attack_size_) * 0.5f,
-        y_ - attack_size_ - padding,
-        attack_size_,
-        attack_size_
+        x_ + (size_ - width) * 0.5f,
+        y_ - height - padding,
+        width,
+        height
     };
 }
 
@@ -354,7 +361,7 @@ float Player::dash_cooldown_seconds() const {
 }
 
 float Player::attack_size() const {
-    return attack_size_;
+    return attack_main_size_;
 }
 
 bool Player::try_begin_ranged_attack() {
@@ -374,8 +381,12 @@ float Player::projectile_lifetime() const {
     return projectile_lifetime_;
 }
 
-float Player::projectile_size() const {
-    return projectile_size_;
+float Player::projectile_width() const {
+    return projectile_width_;
+}
+
+float Player::projectile_height() const {
+    return projectile_height_;
 }
 
 int Player::projectile_damage() const {
@@ -387,11 +398,11 @@ float Player::projectile_knockback() const {
 }
 
 float Player::projectile_spawn_x() const {
-    return center_x() - projectile_size_ * 0.5f;
+    return center_x() - projectile_width_ * 0.5f;
 }
 
 float Player::projectile_spawn_y() const {
-    return center_y() - projectile_size_ * 0.5f;
+    return center_y() - projectile_height_ * 0.5f;
 }
 
 float Player::facing_x() const {
@@ -400,6 +411,121 @@ float Player::facing_x() const {
 
 float Player::facing_y() const {
     return facing_y_;
+}
+
+SDL_Color Player::body_color() const {
+    return body_color_;
+}
+
+SDL_Color Player::attack_color() const {
+    return attack_color_;
+}
+
+SDL_Color Player::projectile_color() const {
+    return projectile_color_;
+}
+
+CharacterType Player::character_type() const {
+    return character_type_;
+}
+
+const char* Player::character_name() const {
+    switch (character_type_) {
+        case CharacterType::Hammer:
+            return "Hammer";
+        case CharacterType::Bow:
+            return "Bow";
+        case CharacterType::Spear:
+            return "Spear";
+        default:
+            return "None";
+    }
+}
+
+void Player::select_character(CharacterType type) {
+    character_type_ = type;
+
+    switch (type) {
+        case CharacterType::Hammer:
+            body_color_ = SDL_Color{150, 150, 150, 255};
+            attack_color_ = SDL_Color{235, 190, 70, 255};
+            projectile_color_ = SDL_Color{160, 160, 160, 255};
+
+            attack_duration_ = 0.14f;
+            attack_cooldown_duration_ = 0.42f;
+            attack_main_size_ = 58.0f;
+            attack_cross_size_ = 58.0f;
+
+            ranged_cooldown_duration_ = 0.75f;
+            projectile_speed_ = 430.0f;
+            projectile_lifetime_ = 0.85f;
+            projectile_width_ = 24.0f;
+            projectile_height_ = 24.0f;
+            projectile_damage_ = 1;
+            projectile_knockback_ = 420.0f;
+            break;
+
+        case CharacterType::Bow:
+            body_color_ = SDL_Color{90, 180, 255, 255};
+            attack_color_ = SDL_Color{220, 220, 220, 255};
+            projectile_color_ = SDL_Color{120, 240, 240, 255};
+
+            attack_duration_ = 0.10f;
+            attack_cooldown_duration_ = 0.18f;
+            attack_main_size_ = 24.0f;
+            attack_cross_size_ = 24.0f;
+
+            ranged_cooldown_duration_ = 0.26f;
+            projectile_speed_ = 930.0f;
+            projectile_lifetime_ = 1.35f;
+            projectile_width_ = 24.0f;
+            projectile_height_ = 8.0f;
+            projectile_damage_ = 1;
+            projectile_knockback_ = 180.0f;
+            break;
+
+        case CharacterType::Spear:
+            body_color_ = SDL_Color{120, 230, 170, 255};
+            attack_color_ = SDL_Color{250, 235, 140, 255};
+            projectile_color_ = SDL_Color{250, 235, 140, 255};
+
+            attack_duration_ = 0.11f;
+            attack_cooldown_duration_ = 0.28f;
+            attack_main_size_ = 68.0f;
+            attack_cross_size_ = 18.0f;
+
+            ranged_cooldown_duration_ = 0.42f;
+            projectile_speed_ = 700.0f;
+            projectile_lifetime_ = 1.10f;
+            projectile_width_ = 34.0f;
+            projectile_height_ = 10.0f;
+            projectile_damage_ = 1;
+            projectile_knockback_ = 300.0f;
+            break;
+
+        default:
+            body_color_ = SDL_Color{80, 200, 120, 255};
+            attack_color_ = SDL_Color{240, 220, 90, 255};
+            projectile_color_ = SDL_Color{140, 230, 230, 255};
+
+            attack_duration_ = 0.12f;
+            attack_cooldown_duration_ = 0.25f;
+            attack_main_size_ = 36.0f;
+            attack_cross_size_ = 36.0f;
+
+            ranged_cooldown_duration_ = 0.55f;
+            projectile_speed_ = 620.0f;
+            projectile_lifetime_ = 0.95f;
+            projectile_width_ = 18.0f;
+            projectile_height_ = 18.0f;
+            projectile_damage_ = 1;
+            projectile_knockback_ = 260.0f;
+            break;
+    }
+
+    ranged_cooldown_timer_ = 0.0f;
+    attack_cooldown_timer_ = 0.0f;
+    attack_timer_ = 0.0f;
 }
 
 void Player::increase_move_speed(float amount) {
@@ -425,7 +551,8 @@ void Player::increase_dash_speed(float amount) {
 }
 
 void Player::increase_attack_size(float amount) {
-    attack_size_ = std::clamp(attack_size_ + amount, 16.0f, 120.0f);
+    attack_main_size_ = std::clamp(attack_main_size_ + amount, 16.0f, 140.0f);
+    attack_cross_size_ = std::clamp(attack_cross_size_ + amount * 0.6f, 8.0f, 120.0f);
 }
 
 void Player::reset() {
@@ -446,13 +573,15 @@ void Player::reset() {
     attack_cooldown_timer_ = 0.0f;
     attack_duration_ = 0.12f;
     attack_cooldown_duration_ = 0.25f;
-    attack_size_ = 36.0f;
+    attack_main_size_ = 36.0f;
+    attack_cross_size_ = 36.0f;
 
     ranged_cooldown_timer_ = 0.0f;
     ranged_cooldown_duration_ = 0.55f;
     projectile_speed_ = 620.0f;
     projectile_lifetime_ = 0.95f;
-    projectile_size_ = 18.0f;
+    projectile_width_ = 18.0f;
+    projectile_height_ = 18.0f;
     projectile_damage_ = 1;
     projectile_knockback_ = 260.0f;
 
@@ -473,6 +602,11 @@ void Player::reset() {
     damage_invulnerability_duration_ = 1.00f;
 
     hp_ = max_hp_ = 5;
+
+    character_type_ = CharacterType::None;
+    body_color_ = SDL_Color{80, 200, 120, 255};
+    attack_color_ = SDL_Color{240, 220, 90, 255};
+    projectile_color_ = SDL_Color{140, 230, 230, 255};
 }
 
 float Player::center_x() const {

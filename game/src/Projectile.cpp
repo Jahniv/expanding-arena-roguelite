@@ -1,6 +1,5 @@
 #include "ear/Projectile.hpp"
 
-#include <algorithm>
 #include <cmath>
 
 namespace ear {
@@ -12,13 +11,15 @@ Projectile::Projectile(
     float dir_y,
     float speed,
     float lifetime_seconds,
-    float size,
+    float width,
+    float height,
     int damage,
     float knockback_strength,
     SDL_Color color)
     : x_(x),
       y_(y),
-      size_(size),
+      width_(width),
+      height_(height),
       lifetime_seconds_(lifetime_seconds),
       damage_(damage),
       knockback_strength_(knockback_strength),
@@ -48,9 +49,9 @@ void Projectile::update(float dt_seconds, int window_width, int window_height) {
     x_ += velocity_x_ * dt_seconds;
     y_ += velocity_y_ * dt_seconds;
 
-    if (x_ < -size_ || y_ < -size_ ||
-        x_ > static_cast<float>(window_width) + size_ ||
-        y_ > static_cast<float>(window_height) + size_) {
+    if (x_ < -width_ || y_ < -height_ ||
+        x_ > static_cast<float>(window_width) + width_ ||
+        y_ > static_cast<float>(window_height) + height_) {
         alive_ = false;
     }
 }
@@ -66,7 +67,13 @@ void Projectile::render(SDL_Renderer* renderer) const {
 }
 
 SDL_FRect Projectile::bounds() const {
-    return SDL_FRect{ x_, y_, size_, size_ };
+    const bool horizontal = std::abs(velocity_x_) >= std::abs(velocity_y_);
+
+    if (horizontal) {
+        return SDL_FRect{ x_, y_, width_, height_ };
+    }
+
+    return SDL_FRect{ x_, y_, height_, width_ };
 }
 
 bool Projectile::is_alive() const {

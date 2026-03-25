@@ -13,7 +13,8 @@ public:
         float dir_y,
         float speed,
         float lifetime_seconds,
-        float size,
+        float width,
+        float height,
         int damage,
         float knockback_strength,
         SDL_Color color = SDL_Color{220, 220, 220, 255});
@@ -34,7 +35,8 @@ private:
     float y_ = 0.0f;
     float velocity_x_ = 0.0f;
     float velocity_y_ = 0.0f;
-    float size_ = 16.0f;
+    float width_ = 16.0f;
+    float height_ = 16.0f;
     float lifetime_seconds_ = 1.0f;
     int damage_ = 1;
     float knockback_strength_ = 220.0f;

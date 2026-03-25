@@ -93,6 +93,7 @@ TEST_CASE("projectile expires after lifetime") {
         100.0f,
         0.10f,
         10.0f,
+        10.0f,
         1,
         100.0f);
 
@@ -101,4 +102,18 @@ TEST_CASE("projectile expires after lifetime") {
     projectile.update(0.20f, 1280, 720);
 
     REQUIRE_FALSE(projectile.is_alive());
+}
+
+TEST_CASE("character loadouts differ") {
+    ear::Player hammer;
+    ear::Player bow;
+    ear::Player spear;
+
+    hammer.select_character(ear::CharacterType::Hammer);
+    bow.select_character(ear::CharacterType::Bow);
+    spear.select_character(ear::CharacterType::Spear);
+
+    REQUIRE(hammer.projectile_speed() < bow.projectile_speed());
+    REQUIRE(spear.attack_size() > bow.attack_size());
+    REQUIRE(hammer.projectile_height() > bow.projectile_height());
 }
